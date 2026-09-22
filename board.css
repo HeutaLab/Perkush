@@ -1,120 +1,13 @@
-:root {
-  color-scheme: light;
-  --ink: #1e2a4a;
-  --sky-1: #36b9ff;
-  --sky-2: #8ddcff;
-  --sky-3: #cdf1ff;
-  --white: #fff;
-  --yellow: #ffd23f;
-  --yellow-d: #e2a800;
-  --orange: #ff9a3d;
-  --orange-d: #dc7016;
-  --pink: #ff75b8;
-  --pink-d: #de4a92;
-  --purple: #b48cff;
-  --purple-d: #8a5ce0;
-  --blue: #45bcff;
-  --blue-d: #1c8fd6;
-  --green: #84dc5a;
-  --green-d: #52b030;
-  --red: #ff5a5a;
-  --coral: #ff7a7a;
-  --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif;
-}
+/* The drum board page. */
 
-* { box-sizing: border-box; }
-
-html,
-body {
-  height: 100%;
-  margin: 0;
-  background: var(--sky-2);
-  color: var(--ink);
-}
-
-body {
-  font: 700 16px/1.3 var(--font);
+body.board {
   overflow: hidden;
   overscroll-behavior: none;
-  -webkit-text-size-adjust: 100%;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-
-button {
-  font: inherit;
-  color: inherit;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-/* ---- scenery ---- */
-
-.scene {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--sky-3) 100%);
-}
-
-.sun {
-  position: absolute;
-  top: -46px;
-  right: -44px;
-  width: 172px;
-  height: 172px;
-}
-
-.sun .rays {
-  transform-origin: 100px 100px;
-  animation: spin 60s linear infinite;
-}
-
-.cloud {
-  position: absolute;
-  left: 0;
-  width: 190px;
-  fill: #fff;
-  stroke: #a9dcf4;
-  stroke-width: 4;
-  stroke-linejoin: round;
-  animation: drift linear infinite;
-}
-
-.cloud.c1 { top: 6%; width: 210px; animation-duration: 100s; animation-delay: -30s; }
-.cloud.c2 { top: 38%; width: 150px; animation-duration: 130s; animation-delay: -95s; }
-.cloud.c3 { top: 66%; width: 240px; animation-duration: 150s; animation-delay: -40s; }
-
-.hills {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  display: block;
-  width: 100%;
-  height: clamp(110px, 24vh, 240px);
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes drift {
-  from { transform: translateX(-280px); }
-  to { transform: translateX(calc(100vw + 40px)); }
-}
-
-/* ---- layout ---- */
 
 #app {
   position: fixed;
@@ -137,88 +30,18 @@ button {
   min-height: 56px;
 }
 
-.title {
-  position: relative;
-  z-index: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.35em;
-  margin: 0;
-  font-size: clamp(19px, 4.4vw, 36px);
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
+.home-link {
+  color: inherit;
+  text-decoration: none;
+  -webkit-touch-callout: none;
 }
 
-.mascot {
-  flex: none;
-  width: 1.75em;
-  height: 1.75em;
-  overflow: visible;
+.topbar .title {
+  font-size: clamp(24px, 5.6vw, 42px);
 }
 
-.letters {
-  display: flex;
-  gap: 0.3em;
-}
-
-.word {
-  display: flex;
-}
-
-/* Each letter gets a thick outline drawn behind it, cartoon-style. */
-.word b {
-  position: relative;
-  display: inline-block;
-  color: var(--c);
-  font-weight: 900;
-}
-
-.word b::before {
-  content: attr(data-l);
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: -1;
-  color: var(--ink);
-  -webkit-text-stroke: 0.24em var(--ink);
-  text-shadow: 0 0.13em 0 var(--ink);
-}
-
-.word b:nth-child(odd) { transform: rotate(-5deg); }
-.word b:nth-child(even) { transform: rotate(4deg) translateY(-0.05em); }
-
-.pill {
-  appearance: none;
-  -webkit-appearance: none;
-  flex: none;
-  height: 46px;
-  min-width: 92px;
-  padding: 0 20px;
+.topbar .pill {
   margin-left: auto;
-  border: 3px solid var(--ink);
-  border-radius: 999px;
-  background: var(--white);
-  box-shadow: 0 4px 0 var(--ink);
-  color: var(--ink);
-  font-size: 19px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: transform 0.06s, box-shadow 0.06s;
-}
-
-.pill:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
-}
-
-.pill[aria-pressed="true"] {
-  background: var(--green);
-}
-
-.pill:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 #stage {
@@ -279,6 +102,7 @@ button {
 
 .face,
 .flash,
+.inst-face,
 .capture,
 .edit-face {
   position: absolute;
@@ -295,7 +119,8 @@ button {
 }
 
 .pad[data-state="empty"] .face,
-.pad[data-state="loading"] .face {
+.pad[data-state="loading"] .face,
+.pad[data-kind="inst"] .face {
   visibility: hidden;
 }
 
@@ -305,7 +130,40 @@ button {
   pointer-events: none;
 }
 
-/* empty: a big friendly record button */
+/* A pad holding one of the built-in instruments. */
+.inst-face {
+  container-type: size;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 4px 4px 6px;
+  background: radial-gradient(circle at 50% 42%, var(--white) 0 50%, var(--cream) 100%);
+  box-shadow: 0 0 0 2.5px var(--ink);
+}
+
+.pad[data-kind="inst"] .inst-face {
+  display: flex;
+}
+
+.inst-face .inst-art {
+  width: 64%;
+  width: min(90cqw, 78cqh);
+  flex: none;
+}
+
+.inst-face .inst-label {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.inst-face .pow {
+  top: 4%;
+  font-size: 26px;
+}
+
+/* empty: a big friendly "add" button */
 
 .empty-face {
   position: absolute;
@@ -326,24 +184,13 @@ button {
   display: flex;
 }
 
-.rec-dot {
-  display: grid;
-  place-items: center;
+.add-dot {
   width: 60px;
   height: 60px;
   border: 3px solid var(--ink);
   border-radius: 50%;
-  background: var(--white);
+  background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5v14M5 12h14' stroke='%231e2a4a' stroke-width='6.5' stroke-linecap='round'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='%23ff5a5a' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 58% no-repeat;
   box-shadow: 0 4px 0 var(--ink);
-}
-
-.rec-dot::before {
-  content: "";
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #ffc2c2 0 16%, var(--red) 19% 100%);
 }
 
 .num {
@@ -367,7 +214,7 @@ button {
   display: none;
 }
 
-/* edit mode: re-record / clear on filled pads */
+/* edit mode: change / clear on filled pads */
 
 .edit-face {
   display: none;
@@ -376,48 +223,14 @@ button {
   justify-content: center;
   gap: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.55);
 }
 
 #board.editing .pad[data-state="filled"] .edit-face {
   display: flex;
 }
 
-.btn {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: min(88%, 190px);
-  height: 46px;
-  padding: 0 10px;
-  border: 3px solid var(--ink);
-  border-radius: 15px;
-  background: var(--white);
-  box-shadow: 0 4px 0 var(--ink);
-  color: var(--ink);
-  font-size: 16px;
-  font-weight: 900;
-  line-height: 1.1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: transform 0.06s, box-shadow 0.06s;
-}
-
-.btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
-}
-
-.btn svg {
-  flex: none;
-  width: 20px;
-  height: 20px;
-}
-
-.btn.rerecord { background: var(--blue); }
+.btn.change { background: var(--blue); }
 .btn.clear { background: var(--coral); }
 
 .btn.clear.confirm {
@@ -460,30 +273,12 @@ button {
   pointer-events: none;
 }
 
-.round {
-  appearance: none;
-  -webkit-appearance: none;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--white);
-  box-shadow: 0 3px 0 var(--ink);
-  color: var(--ink);
-  cursor: pointer;
+.cap-top .round {
   pointer-events: auto;
 }
 
 .round[hidden] {
   display: none;
-}
-
-.round svg {
-  width: 20px;
-  height: 20px;
 }
 
 .cap-bottom {
@@ -503,10 +298,7 @@ button {
   color: var(--white);
   font-size: 19px;
   font-weight: 900;
-  text-shadow:
-    2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink),
-    2px 2px 0 var(--ink), -2px 2px 0 var(--ink), 2px -2px 0 var(--ink), -2px -2px 0 var(--ink),
-    0 4px 0 var(--ink);
+  text-shadow: var(--outline-2), 0 4px 0 var(--ink);
 }
 
 .cap-msg small {
@@ -635,17 +427,11 @@ button {
   font-size: 13px;
 }
 
-#board.compact .rec-dot {
+#board.compact .add-dot {
   width: 44px;
   height: 44px;
   border-width: 2.5px;
   box-shadow: 0 3px 0 var(--ink);
-}
-
-#board.compact .rec-dot::before {
-  width: 20px;
-  height: 20px;
-  border-width: 2.5px;
 }
 
 #board.compact .num {
@@ -655,6 +441,14 @@ button {
   height: 24px;
   border-width: 2px;
   font-size: 12px;
+}
+
+#board.compact .inst-face .inst-label {
+  font-size: 12px;
+}
+
+#board.compact .inst-face .pow {
+  font-size: 17px;
 }
 
 #board.compact .edit-face {
@@ -722,37 +516,146 @@ button {
   font-size: 10px;
 }
 
-/* ---- messages ---- */
+/* ---- the sound picker ---- */
 
-.toast {
+.chooser {
   position: fixed;
-  left: 50%;
-  bottom: max(24px, env(safe-area-inset-bottom));
-  z-index: 10;
-  max-width: min(560px, calc(100vw - 32px));
-  padding: 12px 18px;
-  border: 3px solid var(--ink);
-  border-radius: 18px;
-  background: var(--white);
-  box-shadow: 0 5px 0 var(--ink);
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.35;
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, 20px);
-  transition: opacity 0.2s, transform 0.2s;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: rgba(30, 42, 74, 0.45);
 }
 
-.toast.show {
-  opacity: 1;
-  transform: translate(-50%, 0);
+.chooser[hidden] {
+  display: none;
+}
+
+.chooser-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(700px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 18px 18px 22px;
+  border: 4px solid var(--ink);
+  border-radius: 28px;
+  background: var(--white);
+  box-shadow: 0 8px 0 var(--ink);
+  animation: card-in 0.22s ease-out;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+}
+
+.chooser-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chooser-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.choice-record {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  background: var(--red-d);
+  box-shadow: 0 5px 0 var(--ink);
+  color: var(--white);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.choice-record:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.choice-record svg {
+  flex: none;
+  width: 54px;
+  height: 54px;
+}
+
+.choice-record b {
+  display: block;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.choice-record small {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chooser-or {
+  margin: 4px 0 0;
+  font-size: 17px;
+  text-align: center;
+}
+
+.inst-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  padding: 10px 2px 6px;
+}
+
+/* Stays in view at the bottom of the card while the instruments scroll. */
+.use-btn {
+  position: sticky;
+  bottom: 0;
+  flex: none;
+  width: 100%;
+  height: 58px;
+  border-radius: 18px;
+  background: var(--green);
+  box-shadow: 0 4px 0 var(--ink), 0 12px 0 6px var(--white);
+  font-size: 20px;
+}
+
+.use-btn:disabled {
+  background: #e6ebf2;
+  box-shadow: 0 4px 0 #b9c3d3, 0 12px 0 6px var(--white);
+  border-color: #b9c3d3;
+  color: #7a8599;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .inst-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .chooser-head h2 { font-size: 20px; }
+  .choice-record { gap: 10px; padding: 10px 14px; }
+  .choice-record svg { width: 42px; height: 42px; }
+  .choice-record b { font-size: 19px; }
+  .choice-record small { font-size: 13px; }
+  .inst-tile { font-size: 12px; }
 }
 
 @media (max-width: 600px) {
-  .sun { display: none; }
-  .pill { height: 40px; min-width: 76px; padding: 0 14px; font-size: 17px; }
+  .topbar .pill { height: 40px; min-width: 76px; padding: 0 14px; font-size: 17px; }
 }
 
 @media (min-width: 700px) {
@@ -761,12 +664,10 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cloud,
-  .sun .rays,
   .pad[data-state="armed"],
   .btn.clear.confirm,
-  .rec-badge::before {
+  .rec-badge::before,
+  .chooser-card {
     animation: none;
   }
-  .toast { transition: none; }
 }

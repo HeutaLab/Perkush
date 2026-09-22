@@ -1,28 +1,36 @@
-// The board: 12 pads, tap to play / record, edit mode for re-record and clear, and the
-// render loop that keeps each pad's picture on the audio clock.
+// The board: 12 pads. Tap an empty pad to add a sound (record your own with the camera, or
+// pick a cartoon instrument), tap a filled pad to play it, and use Edit to change or clear
+// pads. The render loop keeps each recorded pad's picture on the audio clock.
 
 import * as audio from './audio.js';
 import { CaptureSession, captureErrorMessage, countCameras } from './capture.js';
 import { clipFromCapture, clipFromRecord, releaseClip } from './clip.js';
+import { INSTRUMENTS, instrumentById, instrumentSvg, loadInstruments, tileHtml, animateInstrument } from './instruments.js';
 import * as store from './store.js';
 
 const PAD_COUNT = 12;
 const FRAME_SIZE = 256;      // longest side of a stored video frame (px)
 const DISPLAY_LEAD = 0.02;   // a frame drawn now reaches the screen about a refresh later
 const FACING_KEY = 'video-drum-board.facing';
-const BLOCK_DEPTH = 6;       // px; matches --d in style.css
+const BLOCK_DEPTH = 6;       // px; matches --d in board.css
 
 const ICON_CLOSE =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const ICON_FLIP =
   '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
   '<path d="M4.5 10a7.5 7.5 0 0 1 13.4-3.6M19.5 14a7.5 7.5 0 0 1-13.4 3.6"/><path d="M18.5 3v4h-4M5.5 21v-4h4"/></svg>';
-const ICON_REDO =
+const ICON_SWAP =
   '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">' +
-  '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 3.5v4.5H15"/></svg>';
+  '<path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg>';
 const ICON_TRASH =
   '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
   '<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10.5 11v5.5M13.5 11v5.5"/></svg>';
+const ICON_CAMERA =
+  '<svg viewBox="0 0 48 48" aria-hidden="true">' +
+  '<path d="M15 14l3-6h12l3 6" fill="#fff" stroke="#1e2a4a" stroke-width="3" stroke-linejoin="round"/>' +
+  '<rect x="4" y="13" width="40" height="28" rx="7" fill="#fff" stroke="#1e2a4a" stroke-width="3"/>' +
+  '<circle cx="24" cy="27" r="8.5" fill="#45bcff" stroke="#1e2a4a" stroke-width="3"/>' +
+  '<circle cx="21.5" cy="24.5" r="2.5" fill="#fff"/><circle cx="37" cy="19.5" r="2.3" fill="#ff5a5a"/></svg>';
 
 const stage = document.getElementById('stage');
 const board = document.getElementById('board');
@@ -35,6 +43,7 @@ const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-m
 const pads = [];
 let editing = false;
 let capture = null;          // the recording in progress: { pad, session, ui, phase, ... }
+let chooser = null;          // the "add a sound" picker, built on first use
 let facing = loadFacing();
 let cameraCount = 2;         // assume a camera switch is possible until we know better
 let raf = 0;
@@ -51,10 +60,11 @@ function createPad(index) {
   el.innerHTML =
     '<canvas class="face"></canvas>' +
     '<div class="flash"></div>' +
-    '<div class="empty-face" aria-hidden="true"><span class="rec-dot"></span><span>Tap to record</span></div>' +
+    '<div class="inst-face" aria-hidden="true"><span class="inst-art"></span><span class="inst-label"></span><span class="pow"></span></div>' +
+    '<div class="empty-face" aria-hidden="true"><span class="add-dot"></span><span>Add a sound</span></div>' +
     `<span class="num" aria-hidden="true">${n}</span>` +
     '<div class="edit-face">' +
-    `<button type="button" class="btn rerecord" aria-label="Re-record pad ${n}">${ICON_REDO}<span>Re-record</span></button>` +
+    `<button type="button" class="btn change" aria-label="Change pad ${n}">${ICON_SWAP}<span>Change</span></button>` +
     `<button type="button" class="btn clear" aria-label="Clear pad ${n}">${ICON_TRASH}<span class="clear-label">Clear</span></button>` +
     '</div>';
   const canvas = el.querySelector('canvas');
@@ -64,6 +74,9 @@ function createPad(index) {
     canvas,
     g: canvas.getContext('2d'),
     flash: el.querySelector('.flash'),
+    instArt: el.querySelector('.inst-art'),
+    instLabel: el.querySelector('.inst-label'),
+    pow: el.querySelector('.pow'),
     clearButton: el.querySelector('.clear'),
     clearLabel: el.querySelector('.clear-label'),
     clip: null,
@@ -85,15 +98,16 @@ function createPad(index) {
 function setState(pad, state) {
   pad.el.dataset.state = state;
   const n = pad.index + 1;
+  const what = pad.clip && pad.clip.kind === 'inst' ? pad.clip.inst.name : 'your sound';
   const label =
-    state === 'filled' ? `Pad ${n}, play` :
-    state === 'empty' ? `Pad ${n}, empty, record` :
+    state === 'filled' ? `Pad ${n}, ${what}, play` :
+    state === 'empty' ? `Pad ${n}, empty, add a sound` :
     `Pad ${n}, recording`;
   pad.el.setAttribute('aria-label', label);
 }
 
-// Playing happens on pointerdown for the lowest latency; recording and edit actions use
-// click, which also counts as the gesture iOS needs to start audio.
+// Playing happens on pointerdown for the lowest latency; adding sounds and edit actions use
+// click, which also counts as the gesture iOS needs to start audio and the camera.
 function onPadDown(pad, e) {
   if (e.button > 0) return;
   if (capture) {
@@ -119,9 +133,9 @@ function onPadClick(pad, e) {
     else if (button.classList.contains('flip')) flipCamera();
     return;
   }
-  if (button && button.classList.contains('rerecord')) startCapture(pad);
+  if (button && button.classList.contains('change')) openChooser(pad);
   else if (button && button.classList.contains('clear')) onClear(pad);
-  else if (!pad.clip && pad.el.dataset.state === 'empty') startCapture(pad);
+  else if (!pad.clip && pad.el.dataset.state === 'empty') openChooser(pad);
 }
 
 function onPadKey(pad, e) {
@@ -133,17 +147,21 @@ function onPadKey(pad, e) {
   } else if (pad.clip) {
     hit(pad);
   } else if (pad.el.dataset.state === 'empty') {
-    startCapture(pad);
+    openChooser(pad);
   }
 }
 
 function hit(pad) {
   const clip = pad.clip;
   pad.voice = { start: audio.play(pad.index, clip.buffer), clip };
-  if (pad.shown !== 0) drawFrame(pad, 0);
   pad.el.classList.add('playing');
   press(pad);
-  if (pad.flash.animate) pad.flash.animate([{ opacity: 0.35 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' });
+  if (clip.kind === 'inst') {
+    animateInstrument(pad.instArt, pad.pow, clip.inst, reducedMotion);
+  } else {
+    if (pad.shown !== 0) drawFrame(pad, 0);
+    if (pad.flash.animate) pad.flash.animate([{ opacity: 0.35 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' });
+  }
   hop();
   kick();
 }
@@ -164,7 +182,7 @@ function hop() {
   );
 }
 
-// A freshly recorded pad pops into place.
+// A freshly filled pad pops into place.
 function celebrate(pad) {
   if (reducedMotion || !pad.el.animate) return;
   pad.el.animate(
@@ -180,8 +198,146 @@ function installClip(pad, clip) {
   const old = pad.clip;
   pad.clip = clip;
   if (old) releaseClip(old);
-  pad.shown = -1;
-  drawFrame(pad, 0);
+  pad.el.dataset.kind = clip.kind === 'inst' ? 'inst' : 'video';
+  if (clip.kind === 'inst') {
+    pad.instArt.innerHTML = instrumentSvg(clip.inst);
+    pad.instLabel.textContent = clip.inst.name;
+    pad.pow.textContent = clip.inst.word;
+  } else {
+    pad.instArt.innerHTML = '';
+    pad.shown = -1;
+    drawFrame(pad, 0);
+  }
+}
+
+// ---- built-in instruments ----
+
+async function instrumentClip(inst) {
+  const buffers = await loadInstruments();
+  const buffer = buffers.get(inst.id);
+  return { kind: 'inst', inst, buffer, duration: buffer.duration };
+}
+
+async function assignInstrument(pad, inst) {
+  let clip;
+  try {
+    clip = await instrumentClip(inst);
+  } catch (err) {
+    toast(`The ${inst.name} could not be made (${errorText(err)}).`);
+    return;
+  }
+  if (capture && capture.pad === pad) return;
+  installClip(pad, clip);
+  setState(pad, 'filled');
+  updateChrome();
+  celebrate(pad);
+  persist(pad, async () => {
+    await store.savePad({ pad: pad.index, v: 1, kind: 'inst', inst: inst.id, created: Date.now() });
+    store.requestPersistence();
+  }, `Pad ${pad.index + 1} could not be saved`, 'It will be gone after a reload.');
+}
+
+// ---- the "add a sound" picker ----
+
+function buildChooser() {
+  const root = document.createElement('div');
+  root.className = 'chooser';
+  root.hidden = true;
+  root.innerHTML =
+    '<div class="chooser-card" role="dialog" aria-modal="true" aria-labelledby="chooser-title">' +
+    '<div class="chooser-head">' +
+    '<h2 id="chooser-title">Pick a sound for pad <span class="chooser-num"></span></h2>' +
+    `<button type="button" class="round chooser-close" aria-label="Close">${ICON_CLOSE}</button>` +
+    '</div>' +
+    `<button type="button" class="choice-record">${ICON_CAMERA}<span><b>Record your own</b><small>Use the camera and make a noise</small></span></button>` +
+    '<p class="chooser-or">or tap an instrument to hear it</p>' +
+    `<div class="inst-grid">${INSTRUMENTS.map(tileHtml).join('')}</div>` +
+    '<button type="button" class="btn use-btn" disabled></button>' +
+    '</div>';
+  document.body.appendChild(root);
+
+  const c = {
+    root,
+    pad: null,
+    selected: null,
+    num: root.querySelector('.chooser-num'),
+    record: root.querySelector('.choice-record'),
+    grid: root.querySelector('.inst-grid'),
+    use: root.querySelector('.use-btn'),
+  };
+
+  root.addEventListener('click', (e) => {
+    if (e.target === root || e.target.closest('.chooser-close')) closeChooser();
+  });
+  c.record.addEventListener('click', () => {
+    const pad = c.pad;
+    closeChooser();
+    if (pad) startCapture(pad);
+  });
+  // Hear an instrument the moment it's touched; the click that follows selects it, and
+  // tapping the selected one again puts it on the pad.
+  c.grid.addEventListener('pointerdown', (e) => {
+    const tile = e.target.closest('.inst-tile');
+    if (tile && e.button <= 0) preview(tile);
+  });
+  c.grid.addEventListener('click', (e) => {
+    const tile = e.target.closest('.inst-tile');
+    if (!tile) return;
+    const inst = instrumentById(tile.dataset.id);
+    if (e.detail === 0) preview(tile); // keyboard: no pointerdown came first
+    if (c.selected === inst) useSelected();
+    else select(inst);
+  });
+  c.use.addEventListener('click', useSelected);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !root.hidden) closeChooser();
+  });
+  return c;
+}
+
+function openChooser(pad) {
+  if (capture) return;
+  if (!chooser) chooser = buildChooser();
+  audio.unlock(); // this runs inside the tap, which is when iOS allows sound to start
+  cancelConfirm(pad);
+  chooser.pad = pad;
+  chooser.num.textContent = String(pad.index + 1);
+  select(null);
+  chooser.root.hidden = false;
+  chooser.record.focus({ preventScroll: true });
+  loadInstruments().catch(() => {}); // warm up, so the first tap on an instrument plays at once
+}
+
+function closeChooser() {
+  if (!chooser || chooser.root.hidden) return;
+  audio.stop('preview');
+  chooser.root.hidden = true;
+  const pad = chooser.pad;
+  chooser.pad = null;
+  if (pad) pad.el.focus({ preventScroll: true });
+}
+
+function select(inst) {
+  chooser.selected = inst;
+  for (const tile of chooser.grid.children) {
+    tile.setAttribute('aria-pressed', String(!!inst && tile.dataset.id === inst.id));
+  }
+  chooser.use.disabled = !inst;
+  chooser.use.textContent = inst ? `Use the ${inst.name}!` : 'Tap an instrument to hear it';
+}
+
+function preview(tile) {
+  const inst = instrumentById(tile.dataset.id);
+  animateInstrument(tile.querySelector('.inst-art'), tile.querySelector('.pow'), inst, reducedMotion);
+  loadInstruments().then((buffers) => audio.play('preview', buffers.get(inst.id)), () => {});
+}
+
+function useSelected() {
+  if (!chooser || !chooser.selected || !chooser.pad) return;
+  const pad = chooser.pad;
+  const inst = chooser.selected;
+  closeChooser();
+  assignInstrument(pad, inst);
 }
 
 // ---- drawing ----
@@ -189,7 +345,7 @@ function installClip(pad, clip) {
 function drawFrame(pad, i) {
   const clip = pad.clip;
   const c = pad.canvas;
-  if (!clip || !c.width || !c.height) return;
+  if (!clip || clip.kind === 'inst' || !c.width || !c.height) return;
   const col = i % clip.cols;
   const row = Math.floor(i / clip.cols);
   // Cover-fit the frame into the pad, inset 1px so neighbouring frames never bleed in.
@@ -228,6 +384,7 @@ function tick() {
       continue;
     }
     again = true;
+    if (voice.clip.kind === 'inst') continue;
     const i = t <= 0 ? 0 : frameAt(voice.clip.times, t);
     if (i !== pad.shown) drawFrame(pad, i);
   }
@@ -436,13 +593,15 @@ function clearPad(pad) {
   pad.clip = null;
   pad.shown = -1;
   pad.g.clearRect(0, 0, pad.canvas.width, pad.canvas.height);
+  pad.instArt.innerHTML = '';
+  delete pad.el.dataset.kind;
   setState(pad, 'empty');
   updateChrome();
   persist(pad, () => store.deletePad(pad.index), `Pad ${pad.index + 1} could not be cleared from storage`, 'It may come back after a reload.');
 }
 
-// Storage work for a pad runs in order, so a quick clear or re-record can't be undone
-// by an older save finishing late.
+// Storage work for a pad runs in order, so a quick clear or change can't be undone by an
+// older save finishing late.
 function persist(pad, op, failure, consequence) {
   pad.io = pad.io.then(op).catch((err) => toast(`${failure} (${errorText(err)}). ${consequence}`));
 }
@@ -457,8 +616,8 @@ function updateChrome() {
   hint.textContent = capture
     ? `Recording pad ${capture.pad.index + 1}: make a sound, or tap the pad.`
     : editing
-      ? 'Re-record or clear pads. Tap Done when finished.'
-      : 'Tap an empty pad to record. Tap a filled pad to play.';
+      ? 'Change or clear pads. Tap Done when finished.'
+      : 'Tap an empty pad to add a sound. Tap a filled pad to play it.';
 }
 
 // ---- layout ----
@@ -529,6 +688,15 @@ function saveFacing(value) {
   }
 }
 
+async function restore(record) {
+  if (record.kind === 'inst') {
+    const inst = instrumentById(record.inst);
+    if (!inst) throw new Error(`unknown instrument "${record.inst}"`);
+    return instrumentClip(inst);
+  }
+  return clipFromRecord(record);
+}
+
 async function boot() {
   for (let i = 0; i < PAD_COUNT; i++) {
     const pad = createPad(i);
@@ -564,7 +732,7 @@ async function boot() {
     const pad = pads[record.pad];
     if (!pad || pad.clip || (capture && capture.pad === pad)) return;
     try {
-      installClip(pad, await clipFromRecord(record));
+      installClip(pad, await restore(record));
     } catch (err) {
       console.warn(`Pad ${record.pad + 1} could not be restored`, err);
     }
@@ -573,6 +741,8 @@ async function boot() {
     if (pad.el.dataset.state === 'loading') setState(pad, pad.clip ? 'filled' : 'empty');
   }
   updateChrome();
+  // Get the instrument sounds ready in the background.
+  setTimeout(() => loadInstruments().catch(() => {}), 1200);
 }
 
 boot();

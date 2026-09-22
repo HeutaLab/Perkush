@@ -1,10 +1,12 @@
-# Video Drum Board
+# Perkush
 
-A 3×4 grid of pads in the browser. Each pad holds a short video clip with its own sound, recorded with the device camera and microphone. Tap a pad and its picture and sound play together, like a drum.
+A 3×4 grid of drum pads in the browser. Fill each pad with a short video clip and its sound, recorded with the device camera and microphone, or with one of 15 cartoon percussion instruments. Tap a pad and its picture and sound play together, like a drum.
 
 Plain HTML/CSS/JS with no build step and no dependencies. Built for iPad Safari; also fits iPhone screens and runs in desktop Chromium browsers.
 
-The look is bright and cartoon-like for children: a sky-and-hills scene, chunky outlined "toy block" pads in six colours, a little drum mascot, and Apple's rounded system font (other systems fall back to a similar rounded font, so nothing is downloaded).
+The look is bright and cartoon-like for children: a sky-and-hills scene, chunky outlined "toy block" pads in six colours, a little drum mascot, instruments with faces, and Apple's rounded system font (other systems fall back to a similar rounded font, so nothing is downloaded).
+
+The site opens on a front page (`index.html`) that explains what it does and how to play; **Let's play!** goes to the board (`play.html`).
 
 ## Run it
 
@@ -26,23 +28,28 @@ python3 serve.py
 
 It prints an address such as `https://192.168.1.20:8443`; open it on the phone. Safari warns that the connection is not private, because `serve.py` makes its own throwaway certificate: tap **Show Details**, then **visit this website**, then **Visit Website**. Only the app's own files are served. Each time `serve.py` restarts it makes a new certificate, so the phone shows the warning once more. Boards are saved per address, so if the Mac's address changes, the phone starts with an empty board (the old one stays stored under the old address).
 
-**For a permanent link** (no warning, any network, and you can Add to Home Screen): upload `index.html`, `style.css` and `js/` to any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, …).
+**For a permanent link** (no warning, any network, and you can Add to Home Screen): put the folder on any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, …). It's published at https://heutalab.github.io/Perkush/.
 
 When Safari asks for the camera and microphone, allow both. To stop Safari asking again on later visits, set Camera and Microphone to **Allow** for the site in Safari's website settings.
 
 ## Use it
 
-- **Record:** tap an empty pad. It shows the live camera and listens. Make a sound (clap, knock, "tss") and the pad records it. Recording keeps a moment from just before the sound, stops when the sound dies away, and never runs past 1 second. To record without waiting for a sound, tap the pad again. ✕ cancels, and ⟲ switches between the front and back cameras.
-- **Play:** tap a filled pad. Tapping again restarts it from the top, and several pads can play at once with several fingers.
-- **Re-record / clear:** tap **Edit**. Each filled pad shows **Re-record** and **Clear** (tap Clear twice to confirm). The other pads are untouched. Tap **Done** to go back to playing.
+- **Add a sound:** tap an empty pad. A picker opens with two choices:
+  - **Record your own:** the pad shows the live camera and listens. Make a sound (clap, knock, "tss") and the pad records it. Recording keeps a moment from just before the sound, stops when the sound dies away, and never runs past 1 second. To record without waiting for a sound, tap the pad again. ✕ cancels, and ⟲ switches between the front and back cameras.
+  - **Pick an instrument:** tap one to hear it, then **Use it** (or tap it again) to put it on the pad.
+- **Play:** tap a filled pad. Tapping again restarts it from the top, and several pads can play at once with several fingers. Instruments bounce, ring or shake and pop out a sound word.
+- **Change / clear:** tap **Edit**. Each filled pad shows **Change** (opens the picker, so you can re-record or swap instruments) and **Clear** (tap twice to confirm). The other pads are untouched. Tap **Done** to go back to playing.
 - The board is saved in the browser (IndexedDB) after every change, so a reload brings it back.
 
 ## How it works
 
 | File | Role |
 | --- | --- |
-| `index.html`, `style.css` | Page and layout: 3 columns × 4 rows in portrait, 4 × 3 in landscape |
-| `js/main.js` | Board UI, edit mode, and the render loop that draws each pad's frames |
+| `index.html`, `home.css`, `js/home.js` | Front page: what it is, how to play, tap-to-hear instruments |
+| `play.html`, `board.css` | The board: 3 columns × 4 rows in portrait, 4 × 3 in landscape |
+| `base.css` | Shared look: colours, scenery, title, buttons, instrument tiles |
+| `js/main.js` | Board UI, sound picker, edit mode, and the render loop that draws each pad's frames |
+| `js/instruments.js` | The 15 cartoon instruments: drawings, synthesised sounds and animations |
 | `js/capture.js` | Recording: camera and mic via `getUserMedia`, sound trigger, silence stop |
 | `js/capture-worklet.js` | AudioWorklet that streams microphone samples to the page |
 | `js/audio.js` | Shared `AudioContext`: low-latency playback and iOS audio unlock |
@@ -56,6 +63,8 @@ Recording does not use `MediaRecorder`; it captures the raw material directly, w
 - **Picture** as up to 30 frames per second, taken from the live camera and packed into one JPEG image per pad. Each pad's canvas steps through its frames by the audio clock, so picture and sound stay together.
 
 Both are buffered continuously while a pad listens, and share one clock. That allows the clip to start a few milliseconds before the detected sound (so the attack is kept) with frames lined up to the audio. Screen taps are loud to the iPad's microphone, so a tap on the glass is not treated as the recorded sound.
+
+The instruments need no sound files: each is synthesised with Web Audio (classic drum-machine recipes: pitch-swept sine for the big drum, filtered noise for snare and shakers, detuned square waves for cymbals and cowbell) in one offline render when the app starts, then played exactly like a recorded pad. A pad with an instrument is saved as just its name.
 
 ## Worth checking on a real iPad
 

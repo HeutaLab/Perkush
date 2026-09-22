@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve the Video Drum Board to a phone or tablet on the same Wi-Fi, over HTTPS.
+"""Serve Perkush to a phone or tablet on the same Wi-Fi, over HTTPS.
 
 Safari only allows the camera and microphone on HTTPS pages, so this uses a
 throwaway self-signed certificate. The phone warns that the connection is not
@@ -21,7 +21,7 @@ import tempfile
 from urllib.parse import unquote
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-APP_FILES = ('/', '/index.html', '/style.css')
+APP_FILES = ('/', '/index.html', '/play.html', '/base.css', '/board.css', '/home.css')
 APP_DIRS = ('/js/',)
 
 
@@ -41,7 +41,7 @@ def make_certificate(folder, ip):
     with open(config, 'w') as f:
         f.write(
             '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n'
-            '[dn]\nCN = Video Drum Board (local)\n'
+            '[dn]\nCN = Perkush (local)\n'
             f'[ext]\nsubjectAltName = IP:{ip}, IP:127.0.0.1, DNS:localhost\n'
             'basicConstraints = critical, CA:false\n'
             'keyUsage = critical, digitalSignature, keyEncipherment\n'

@@ -1,0 +1,373 @@
+/* Shared look for every page: colours, scenery, title, buttons and instrument tiles. */
+
+:root {
+  color-scheme: light;
+  --ink: #1e2a4a;
+  --sky-1: #36b9ff;
+  --sky-2: #8ddcff;
+  --sky-3: #cdf1ff;
+  --white: #fff;
+  --cream: #fff8e1;
+  --yellow: #ffd23f;
+  --yellow-d: #e2a800;
+  --orange: #ff9a3d;
+  --orange-d: #dc7016;
+  --pink: #ff75b8;
+  --pink-d: #de4a92;
+  --purple: #b48cff;
+  --purple-d: #8a5ce0;
+  --blue: #45bcff;
+  --blue-d: #1c8fd6;
+  --green: #84dc5a;
+  --green-d: #52b030;
+  --red: #ff5a5a;
+  --red-d: #d93a3a;
+  --coral: #ff7a7a;
+  --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif;
+  --outline-2: 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink),
+    2px 2px 0 var(--ink), -2px 2px 0 var(--ink), 2px -2px 0 var(--ink), -2px -2px 0 var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  background: var(--sky-2);
+  color: var(--ink);
+}
+
+body {
+  font: 700 16px/1.35 var(--font);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- scenery ---- */
+
+.scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--sky-3) 100%);
+}
+
+.sun {
+  position: absolute;
+  top: -46px;
+  right: -44px;
+  width: 172px;
+  height: 172px;
+}
+
+.sun .rays {
+  transform-origin: 100px 100px;
+  animation: spin 60s linear infinite;
+}
+
+.cloud {
+  position: absolute;
+  left: 0;
+  width: 190px;
+  fill: #fff;
+  stroke: #a9dcf4;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  animation: drift linear infinite;
+}
+
+.cloud.c1 { top: 6%; width: 210px; animation-duration: 100s; animation-delay: -30s; }
+.cloud.c2 { top: 38%; width: 150px; animation-duration: 130s; animation-delay: -95s; }
+.cloud.c3 { top: 66%; width: 240px; animation-duration: 150s; animation-delay: -40s; }
+
+.hills {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: 100%;
+  height: clamp(110px, 24vh, 240px);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes drift {
+  from { transform: translateX(-280px); }
+  to { transform: translateX(calc(100vw + 40px)); }
+}
+
+/* ---- title: rainbow letters with a thick cartoon outline ---- */
+
+.title {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  margin: 0;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mascot {
+  flex: none;
+  width: 1.75em;
+  height: 1.75em;
+  overflow: visible;
+}
+
+.letters {
+  display: flex;
+  gap: 0.3em;
+}
+
+.word {
+  display: flex;
+}
+
+.word b {
+  position: relative;
+  display: inline-block;
+  color: var(--c);
+  font-weight: 900;
+}
+
+.word b::before {
+  content: attr(data-l);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: var(--ink);
+  -webkit-text-stroke: 0.24em var(--ink);
+  text-shadow: 0 0.13em 0 var(--ink);
+}
+
+.word b:nth-child(odd) { transform: rotate(-5deg); }
+.word b:nth-child(even) { transform: rotate(4deg) translateY(-0.05em); }
+
+/* ---- buttons ---- */
+
+.pill {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  height: 46px;
+  min-width: 92px;
+  padding: 0 20px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 4px 0 var(--ink);
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.pill:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.pill[aria-pressed="true"] {
+  background: var(--green);
+}
+
+.pill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: min(88%, 190px);
+  height: 46px;
+  padding: 0 10px;
+  border: 3px solid var(--ink);
+  border-radius: 15px;
+  background: var(--white);
+  box-shadow: 0 4px 0 var(--ink);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.btn svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.round {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 3px 0 var(--ink);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.round svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---- instrument tiles (pad picker and front page) ---- */
+
+.inst-tile {
+  --tile: #fff4c7;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 6px 8px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: var(--tile);
+  box-shadow: 0 5px 0 var(--ink);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.inst-tile:nth-child(6n + 2) { --tile: #ffe3cc; }
+.inst-tile:nth-child(6n + 3) { --tile: #ffe0f0; }
+.inst-tile:nth-child(6n + 4) { --tile: #ece3ff; }
+.inst-tile:nth-child(6n + 5) { --tile: #dcf2ff; }
+.inst-tile:nth-child(6n + 6) { --tile: #e3f8d6; }
+
+.inst-tile:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.inst-tile[aria-pressed="true"] {
+  background: var(--yellow);
+  box-shadow: 0 5px 0 var(--ink), inset 0 0 0 3px var(--white);
+}
+
+.inst-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  transform-origin: 50% 70%;
+}
+
+.inst-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.inst-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The comic word that pops out of an instrument when it plays. */
+.pow {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  z-index: 2;
+  color: var(--yellow);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: var(--outline-2), 0 3px 0 var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -15%) rotate(-8deg);
+}
+
+/* ---- messages ---- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 30;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: var(--white);
+  box-shadow: 0 5px 0 var(--ink);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 20px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 600px) {
+  .sun { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud,
+  .sun .rays {
+    animation: none;
+  }
+  .toast { transition: none; }
+}

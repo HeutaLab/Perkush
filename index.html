@@ -2,14 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#36b9ff">
-  <title>Video Drum Board</title>
+  <meta name="description" content="Perkush: make a drum kit out of anything! Record short video sounds with your camera or pick cartoon instruments, then tap the pads to play.">
+  <title>Perkush</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
-  <script type="module" src="js/main.js"></script>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="home.css">
+  <script type="module" src="js/home.js"></script>
 </head>
-<body>
+<body class="home">
   <div class="scene" aria-hidden="true">
     <svg class="sun" viewBox="0 0 200 200">
       <g class="rays" stroke="#ffb020" stroke-width="12" stroke-linecap="round">
@@ -44,9 +46,9 @@
     </svg>
   </div>
 
-  <div id="app">
-    <header class="topbar">
-      <h1 class="title">
+  <main class="home-main">
+    <header class="hero">
+      <h1 class="title hero-title">
         <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true">
           <g stroke-linecap="round">
             <path d="M14 6L29 21M50 6L35 21" stroke="#1e2a4a" stroke-width="6"/>
@@ -63,20 +65,103 @@
           <circle cx="43.5" cy="39.5" r="2.6" fill="#ffb3c4"/>
           <path d="M28 40Q32 43.5 36 40" fill="none" stroke="#1e2a4a" stroke-width="2.4" stroke-linecap="round"/>
         </svg>
-        <span class="sr-only">Video Drum Board</span>
+        <span class="sr-only">Perkush</span>
         <span class="letters" aria-hidden="true">
-          <span class="word"><b data-l="V" style="--c:#ffd23f">V</b><b data-l="i" style="--c:#ff9a3d">i</b><b data-l="d" style="--c:#ff75b8">d</b><b data-l="e" style="--c:#b48cff">e</b><b data-l="o" style="--c:#45bcff">o</b></span>
-          <span class="word"><b data-l="D" style="--c:#84dc5a">D</b><b data-l="r" style="--c:#ffd23f">r</b><b data-l="u" style="--c:#ff9a3d">u</b><b data-l="m" style="--c:#ff75b8">m</b></span>
-          <span class="word"><b data-l="B" style="--c:#b48cff">B</b><b data-l="o" style="--c:#45bcff">o</b><b data-l="a" style="--c:#84dc5a">a</b><b data-l="r" style="--c:#ffd23f">r</b><b data-l="d" style="--c:#ff9a3d">d</b></span>
+          <span class="word"><b data-l="P" style="--c:#ffd23f">P</b><b data-l="e" style="--c:#ff9a3d">e</b><b data-l="r" style="--c:#ff75b8">r</b><b data-l="k" style="--c:#b48cff">k</b><b data-l="u" style="--c:#45bcff">u</b><b data-l="s" style="--c:#84dc5a">s</b><b data-l="h" style="--c:#ffd23f">h</b></span>
         </span>
       </h1>
-      <p class="hint sr-only" id="hint"></p>
-      <button type="button" class="pill" id="edit" aria-pressed="false" disabled>Edit</button>
+      <p class="bubble">Make a drum kit out of <em>anything!</em> Record a clap, a stomp or a silly noise with the camera, or grab a cartoon instrument. Then tap the pads to play your own band.</p>
+      <a class="play-btn" href="play.html">Let's play!
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </a>
     </header>
-    <main id="stage">
-      <div id="board" role="group" aria-label="Drum pads"></div>
-    </main>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  </div>
+
+    <section class="card" aria-labelledby="how-title">
+      <h2 class="sticker" id="how-title"><span>How to play</span></h2>
+      <ol class="steps">
+        <li class="step">
+          <span class="step-num" style="--c:#ffd23f">1</span>
+          <svg class="step-icon" viewBox="0 0 100 100" aria-hidden="true">
+            <rect x="16" y="22" width="68" height="62" rx="16" fill="#1e2a4a"/>
+            <rect x="16" y="15" width="68" height="62" rx="16" fill="#ffd23f" stroke="#1e2a4a" stroke-width="5"/>
+            <circle cx="50" cy="46" r="17" fill="#fff" stroke="#1e2a4a" stroke-width="4.5"/>
+            <path d="M50 37v18M41 46h18" stroke="#ff5a5a" stroke-width="6" stroke-linecap="round"/>
+            <path d="M90 12l-7 7M94 28h-9M76 4v9" stroke="#1e2a4a" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <h3>Tap a pad</h3>
+          <p>Every coloured block is a pad. Tap an empty one to fill it with a sound.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" style="--c:#ff9a3d">2</span>
+          <svg class="step-icon" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M26 30l4-8h16l4 8" fill="#fff" stroke="#1e2a4a" stroke-width="4" stroke-linejoin="round"/>
+            <rect x="8" y="28" width="60" height="42" rx="10" fill="#45bcff" stroke="#1e2a4a" stroke-width="5"/>
+            <circle cx="38" cy="49" r="12" fill="#fff" stroke="#1e2a4a" stroke-width="4.5"/>
+            <circle cx="38" cy="49" r="5" fill="#1e2a4a"/>
+            <circle cx="58" cy="37" r="3" fill="#ff5a5a"/>
+            <path d="M56 66V84A20 7 0 0 0 96 84V66" fill="#ff5a5a" stroke="#1e2a4a" stroke-width="4.5" stroke-linejoin="round"/>
+            <ellipse cx="76" cy="66" rx="20" ry="7" fill="#fff3d6" stroke="#1e2a4a" stroke-width="4.5"/>
+          </svg>
+          <h3>Add a sound</h3>
+          <p>Record your own: make a noise and the pad catches it on camera. Or pick a ready-made instrument.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" style="--c:#ff75b8">3</span>
+          <svg class="step-icon" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M50 4L59 30L86 18L72 42L98 52L70 60L82 86L56 72L48 98L40 72L14 86L26 60L2 50L28 42L14 18L40 30Z" fill="#ffd23f" stroke="#1e2a4a" stroke-width="4.5" stroke-linejoin="round"/>
+            <rect x="30" y="36" width="40" height="32" rx="9" fill="#ff75b8" stroke="#1e2a4a" stroke-width="4.5"/>
+            <path d="M44 45v14l12-7z" fill="#fff" stroke="#1e2a4a" stroke-width="3" stroke-linejoin="round"/>
+          </svg>
+          <h3>Tap to play!</h3>
+          <p>Tap the pads to hear your sounds and see your videos. Tap really fast for a drum roll.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" style="--c:#84dc5a">4</span>
+          <svg class="step-icon" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M36 72V26L84 16V62" fill="none" stroke="#1e2a4a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M36 26L84 16V30L36 40Z" fill="#1e2a4a"/>
+            <ellipse cx="26" cy="74" rx="13" ry="10" transform="rotate(-20 26 74)" fill="#ff75b8" stroke="#1e2a4a" stroke-width="4.5"/>
+            <ellipse cx="74" cy="64" rx="13" ry="10" transform="rotate(-20 74 64)" fill="#b48cff" stroke="#1e2a4a" stroke-width="4.5"/>
+          </svg>
+          <h3>Make a band</h3>
+          <p>Mix your own sounds with instruments. Use two hands and make up a rhythm!</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="card" aria-labelledby="inst-title">
+      <h2 class="sticker" id="inst-title"><span>Meet the instruments</span></h2>
+      <p class="lead">Tap one to hear it! You can put any of them on a pad.</p>
+      <div class="showcase" id="showcase"></div>
+    </section>
+
+    <section class="card" aria-labelledby="tips-title">
+      <h2 class="sticker" id="tips-title"><span>Tips for great sounds</span></h2>
+      <ul class="tips">
+        <li>Get close to the thing making the sound.</li>
+        <li>A quiet room works best, so the pad only hears your sound.</li>
+        <li>Short, snappy sounds make the best drums: claps, knocks, pops and boings.</li>
+        <li>Want a different sound? Tap <b>Edit</b>, then <b>Change</b> or <b>Clear</b>.</li>
+      </ul>
+    </section>
+
+    <section class="card grownups" aria-labelledby="adults-title">
+      <h2 class="sticker" id="adults-title"><span>For grown-ups</span></h2>
+      <ul class="facts">
+        <li><b>Private.</b> Sounds and videos stay on this device. Nothing is uploaded or shared.</li>
+        <li><b>Camera and microphone</b> are only used while a pad is recording, and the browser asks first.</li>
+        <li><b>Works best</b> in Safari on iPad or iPhone, and in Chrome.</li>
+        <li><b>Keep your board.</b> Add this page to the Home Screen (Share, then Add to Home Screen). Safari may clear saved pads if the site isn't used for a week.</li>
+        <li><b>No sound?</b> Turn the volume up and check that the device isn't on silent.</li>
+      </ul>
+    </section>
+
+    <footer class="home-footer">
+      <a class="play-btn" href="play.html">Let's play!
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </a>
+      <p>Perkush</p>
+    </footer>
+  </main>
 </body>
 </html>
