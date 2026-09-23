@@ -1,0 +1,10 @@
+.git
+.gitignore
+.claude
+.wrangler
+.DS_Store
+.assetsignore
+.nojekyll
+wrangler.jsonc
+README.md
+serve.py

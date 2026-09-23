@@ -1,0 +1,16 @@
+{
+  // Deploys the app as a static-asset Worker on perkush.heutalab.com.
+  // Cloudflare creates the DNS record and certificate for the custom domain itself.
+  // Usage: npx wrangler login (once), then: npx wrangler deploy
+  "name": "perkush",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "."
+  },
+  "routes": [
+    {
+      "pattern": "perkush.heutalab.com",
+      "custom_domain": true
+    }
+  ]
+}

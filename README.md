@@ -28,7 +28,19 @@ python3 serve.py
 
 It prints an address such as `https://192.168.1.20:8443`; open it on the phone. Safari warns that the connection is not private, because `serve.py` makes its own throwaway certificate: tap **Show Details**, then **visit this website**, then **Visit Website**. Only the app's own files are served. Each time `serve.py` restarts it makes a new certificate, so the phone shows the warning once more. Boards are saved per address, so if the Mac's address changes, the phone starts with an empty board (the old one stays stored under the old address).
 
-**For a permanent link** (no warning, any network, and you can Add to Home Screen): put the folder on any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, …). It's published at https://perkush.heutalab.com (also reachable at https://heutalab.github.io/Perkush/).
+**The published site** (no warning, any network, and you can Add to Home Screen) is https://perkush.heutalab.com, with https://heutalab.github.io/Perkush/ as a mirror. Boards are stored per address, so pick one and stay on it.
+
+## Publish it
+
+Two hosts, from the same folder:
+
+```bash
+npx wrangler deploy
+```
+
+puts it on **perkush.heutalab.com** as a Cloudflare Worker serving static assets (`wrangler.jsonc`). The custom domain is declared there, so Cloudflare creates the DNS record and certificate itself; `.assetsignore` keeps `README.md`, `serve.py` and the dotfiles out of what is served. One-time setup: `npx wrangler login`.
+
+Pushing `main` to GitHub deploys the **heutalab.github.io/Perkush** mirror on its own.
 
 When Safari asks for the camera and microphone, allow both. To stop Safari asking again on later visits, set Camera and Microphone to **Allow** for the site in Safari's website settings.
 
@@ -63,6 +75,7 @@ When Safari asks for the camera and microphone, allow both. To stop Safari askin
 | `js/share.js` | Writing a board to a file and reading one back (with validation) |
 | `js/store.js` | IndexedDB: boards, one record per pad, and which board was last open |
 | `serve.py` | Optional: serves the app over HTTPS to devices on your Wi-Fi |
+| `wrangler.jsonc`, `.assetsignore` | Publishing to perkush.heutalab.com as a Cloudflare Worker |
 
 Recording does not use `MediaRecorder`; it captures the raw material directly, which the brief allows ("or equivalent"). An MP4 from `MediaRecorder` has to play through a video element, which isn't built for restarting instantly on every tap or for many pads overlapping. So each pad stores:
 
