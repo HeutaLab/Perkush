@@ -71,9 +71,37 @@
           </span>
         </h1>
       </a>
+      <button type="button" class="pill board-pill" id="boards" aria-haspopup="dialog" aria-label="Board. Tap to switch boards.">
+        <span class="board-name" id="board-name">My board</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <p class="hint sr-only" id="hint"></p>
       <button type="button" class="pill" id="edit" aria-pressed="false" disabled>Edit</button>
     </header>
+
+    <div class="beatbar" id="beatbar" hidden>
+      <button type="button" class="bb rec" id="rec" aria-pressed="false" aria-label="Record what you play">
+        <span class="rec-dot" aria-hidden="true"></span><span class="bb-text">Record</span>
+      </button>
+      <button type="button" class="bb loop" id="loopbtn" data-mode="play" hidden>
+        <svg class="bb-i play-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5l12 7.5-12 7.5z" fill="currentColor"/></svg>
+        <svg class="bb-i stop-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="2.5" fill="currentColor"/></svg>
+        <span class="bb-text">Play</span>
+      </button>
+      <button type="button" class="bb wipe" id="wipe" hidden aria-label="Throw the beat away">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg>
+        <span class="bb-text">Clear</span>
+      </button>
+      <span class="bb-hint" id="bb-hint" aria-hidden="true"></span>
+      <button type="button" class="bb beat" id="beat" aria-pressed="false" aria-label="Play a beat to drum along to">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M10.5 3.5l8-1.6v3.3l-6 1.2v9.3a3.5 3.5 0 1 1-2-3.2z"/></svg>
+        <span class="bb-text">Beat</span>
+      </button>
+      <div class="beat-dots" id="dots" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <button type="button" class="bb speed" id="speed">Medium</button>
+      <div class="bb-line" aria-hidden="true"><div id="bb-fill"></div></div>
+    </div>
+
     <main id="stage">
       <div id="board" role="group" aria-label="Drum pads"></div>
     </main>

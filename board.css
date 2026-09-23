@@ -40,8 +40,194 @@ body.board {
   font-size: clamp(24px, 5.6vw, 42px);
 }
 
-.topbar .pill {
+.topbar #edit {
   margin-left: auto;
+}
+
+/* The board you are on, and the way to the others. */
+.board-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(44vw, 260px);
+  padding: 0 12px 0 16px;
+}
+
+.board-pill .board-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-pill .chev {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- the beat bar ---- */
+
+.beatbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 7px 12px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 5px 0 var(--ink);
+  overflow: hidden;
+}
+
+.beatbar[hidden] {
+  display: none;
+}
+
+/* Says what the red button is for, in the space between the two groups. */
+.bb-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.55;
+}
+
+.bb {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: none;
+  height: 42px;
+  min-width: 42px;
+  padding: 0 14px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 3px 0 var(--ink);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.bb[hidden] {
+  display: none;
+}
+
+.bb:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.bb:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.bb svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.rec-dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.bb.rec.on {
+  background: var(--red);
+  animation: rec-pulse 1.1s ease-in-out infinite;
+}
+
+.bb.rec.on .rec-dot {
+  border-radius: 4px;
+  background: var(--white);
+}
+
+@keyframes rec-pulse {
+  50% { box-shadow: 0 3px 0 var(--ink), 0 0 0 7px rgba(255, 90, 90, 0.35); }
+}
+
+.bb.loop { background: var(--green); }
+.bb .stop-i { display: none; }
+.bb[data-mode="stop"] .play-i { display: none; }
+.bb[data-mode="stop"] .stop-i { display: block; }
+
+.bb.wipe.confirm {
+  background: var(--coral);
+  animation: shake 0.45s ease-in-out infinite;
+}
+
+.bb.beat.on { background: var(--yellow); }
+.bb.beat.loading { animation: waiting 0.9s ease-in-out infinite; }
+
+@keyframes waiting {
+  50% { background: var(--yellow); }
+}
+.bb.speed { min-width: 88px; background: var(--sky-3); }
+
+.beat-dots {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+
+.beat-dots[hidden] {
+  display: none;
+}
+
+.beat-dots i {
+  width: 10px;
+  height: 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--white);
+  transition: transform 0.08s, background-color 0.08s;
+}
+
+.beat-dots i.on {
+  background: var(--yellow);
+  transform: scale(1.3);
+}
+
+/* How far through the loop we are. */
+.bb-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: rgba(30, 42, 74, 0.12);
+}
+
+.bb-line > div {
+  height: 100%;
+  background: var(--red);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+@keyframes shake {
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
 }
 
 #stage {
@@ -263,6 +449,15 @@ body.board {
   transform: scaleX(-1);
 }
 
+/* The frames being kept, silly look and all, drawn over the raw camera picture. */
+.capture .preview {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .cap-top {
   position: absolute;
   top: 8px;
@@ -277,8 +472,45 @@ body.board {
   pointer-events: auto;
 }
 
+/* Flip the camera, and change the silly look. */
+.cap-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .round[hidden] {
   display: none;
+}
+
+/* The name of the silly look, popped up as it changes. */
+.fx-name {
+  position: absolute;
+  left: 50%;
+  top: 36%;
+  z-index: 2;
+  padding: 3px 12px 5px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--yellow);
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0);
+}
+
+.fx-name.show {
+  animation: fx-pop 1.3s ease-out;
+}
+
+@keyframes fx-pop {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); }
+  26% { transform: translate(-50%, 0) scale(1); }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(1); }
 }
 
 .cap-bottom {
@@ -644,8 +876,123 @@ body.board {
   cursor: default;
 }
 
+/* ---- the boards panel ---- */
+
+.sheet-card {
+  width: min(540px, 100%);
+}
+
+.board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  background: var(--cream);
+}
+
+.board-row.active {
+  background: var(--yellow);
+}
+
+.row-open {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.row-sub {
+  font-size: 13px;
+  font-weight: 800;
+  opacity: 0.7;
+}
+
+.row-input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--white);
+  color: var(--ink);
+  font: 900 19px/1.2 var(--font);
+}
+
+.round.tiny {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.round.tiny svg {
+  width: 19px;
+  height: 19px;
+}
+
+.round.tiny:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.round.tiny:disabled {
+  opacity: 0.4;
+}
+
+.round.remove.confirm {
+  background: var(--coral);
+  animation: shake 0.45s ease-in-out infinite;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sheet-actions .btn {
+  width: 100%;
+}
+
+.sheet-note {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  opacity: 0.75;
+}
+
 @media (max-width: 560px) {
   .inst-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .sheet-actions { flex-direction: column; }
+  .row-name { font-size: 19px; }
   .chooser-head h2 { font-size: 20px; }
   .choice-record { gap: 10px; padding: 10px 14px; }
   .choice-record svg { width: 42px; height: 42px; }
@@ -656,6 +1003,16 @@ body.board {
 
 @media (max-width: 600px) {
   .topbar .pill { height: 40px; min-width: 76px; padding: 0 14px; font-size: 17px; }
+  .board-pill { min-width: 0; padding: 0 8px 0 12px; }
+  /* the drum alone stands in for the title, leaving room for the board name */
+  .topbar .letters { display: none; }
+  .beatbar { gap: 6px; padding: 6px 8px 9px; }
+  .bb { height: 40px; min-width: 40px; padding: 0 10px; font-size: 15px; }
+  .bb .bb-text { display: none; }
+  .bb.speed { min-width: 74px; padding: 0 12px; }
+  /* no room for the hint, but it still holds the two groups apart */
+  .bb-hint { visibility: hidden; }
+  .beat-dots i { width: 9px; height: 9px; }
 }
 
 @media (min-width: 700px) {
@@ -667,7 +1024,19 @@ body.board {
   .pad[data-state="armed"],
   .btn.clear.confirm,
   .rec-badge::before,
-  .chooser-card {
+  .chooser-card,
+  .bb.rec.on,
+  .bb.wipe.confirm,
+  .bb.beat.loading,
+  .round.remove.confirm {
     animation: none;
+  }
+
+  .bb.rec.on { box-shadow: 0 3px 0 var(--ink), 0 0 0 5px rgba(255, 90, 90, 0.5); }
+  .fx-name.show { animation: fx-hold 1.3s steps(1, end); }
+
+  @keyframes fx-hold {
+    0%, 99% { opacity: 1; }
+    100% { opacity: 0; }
   }
 }

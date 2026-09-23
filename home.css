@@ -141,6 +141,7 @@ body.home {
 .card:nth-of-type(2) .sticker span { background: var(--blue); transform: rotate(2deg); }
 .card:nth-of-type(3) .sticker span { background: var(--green); }
 .card:nth-of-type(4) .sticker span { background: var(--pink); transform: rotate(1.5deg); }
+.card:nth-of-type(5) .sticker span { background: var(--purple); transform: rotate(-1.5deg); }
 
 .lead {
   margin: 0 0 16px;
@@ -205,6 +206,57 @@ body.home {
   font-size: 16px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+/* ---- more things to try ---- */
+
+.tricks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* picture on the left, heading and words stacked beside it */
+.trick {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 14px;
+  padding: 14px 16px 16px;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  background: var(--cream);
+}
+
+.trick-icon {
+  grid-row: span 2;
+}
+
+/* the fifth one has the row to itself */
+.trick:last-child {
+  grid-column: 1 / -1;
+}
+
+.trick-icon {
+  width: 58px;
+  height: 58px;
+  overflow: visible;
+}
+
+.trick h3 {
+  margin: 2px 0 4px;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.trick p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 /* ---- instruments ---- */
@@ -296,6 +348,7 @@ body.home {
 @media (max-width: 640px) {
   .home-main { gap: 38px; }
   .steps { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .tricks { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .showcase { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .inst-tile { font-size: 12px; }
   .card { padding: 26px 16px 24px; border-radius: 26px; }

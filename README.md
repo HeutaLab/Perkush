@@ -1,6 +1,6 @@
 # Perkush
 
-A 3×4 grid of drum pads in the browser. Fill each pad with a short video clip and its sound, recorded with the device camera and microphone, or with one of 15 cartoon percussion instruments. Tap a pad and its picture and sound play together, like a drum.
+A 3×4 grid of drum pads in the browser. Fill each pad with a short video clip and its sound, recorded with the device camera and microphone, or with one of 15 cartoon percussion instruments. Tap a pad and its picture and sound play together, like a drum. A beat bar records what you play and loops it back, and can keep a drum beat going to play along to. You can keep several named boards, and save one to a file.
 
 Plain HTML/CSS/JS with no build step and no dependencies. Built for iPad Safari; also fits iPhone screens and runs in desktop Chromium browsers.
 
@@ -28,7 +28,7 @@ python3 serve.py
 
 It prints an address such as `https://192.168.1.20:8443`; open it on the phone. Safari warns that the connection is not private, because `serve.py` makes its own throwaway certificate: tap **Show Details**, then **visit this website**, then **Visit Website**. Only the app's own files are served. Each time `serve.py` restarts it makes a new certificate, so the phone shows the warning once more. Boards are saved per address, so if the Mac's address changes, the phone starts with an empty board (the old one stays stored under the old address).
 
-**For a permanent link** (no warning, any network, and you can Add to Home Screen): put the folder on any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, …). It's published at https://heutalab.github.io/Perkush/.
+**For a permanent link** (no warning, any network, and you can Add to Home Screen): put the folder on any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, …). It's published at https://perkush.heutalab.com (also reachable at https://heutalab.github.io/Perkush/).
 
 When Safari asks for the camera and microphone, allow both. To stop Safari asking again on later visits, set Camera and Microphone to **Allow** for the site in Safari's website settings.
 
@@ -38,8 +38,13 @@ When Safari asks for the camera and microphone, allow both. To stop Safari askin
   - **Record your own:** the pad shows the live camera and listens. Make a sound (clap, knock, "tss") and the pad records it. Recording keeps a moment from just before the sound, stops when the sound dies away, and never runs past 1 second. To record without waiting for a sound, tap the pad again. ✕ cancels, and ⟲ switches between the front and back cameras.
   - **Pick an instrument:** tap one to hear it, then **Use it** (or tap it again) to put it on the pad.
 - **Play:** tap a filled pad. Tapping again restarts it from the top, and several pads can play at once with several fingers. Instruments bounce, ring or shake and pop out a sound word.
+- **Record what you play:** the red button in the beat bar. Tap it, tap out a rhythm on the pads, tap it again — the rhythm loops straight back so you can play over it. **Play/Stop** restarts or stops the loop, and the bin (two taps) throws it away. The loop is saved with its board.
+- **Beat:** switches on a simple drum beat — boom on 1 and 3, tak on 2 and 4, a tick in between — to drum along with. The button beside it steps through Slow (72), Medium (96) and Fast (126) BPM, and four dots show where the beat is.
+- **Boards:** the name beside the title opens the boards panel. Make a new board (it gets a name like "Kitchen"), rename one with the pencil, delete one with the bin (two taps, and it takes its pads with it), or tap a board to switch to it. Each board has its own 12 pads and its own loop.
+- **Silly looks:** while a pad is recording, the sparkle button steps through Normal, Wobbly, Rainbow, Big head and Blocky. The pad keeps whatever is on screen, and the choice is remembered for next time.
+- **Save a board to a file:** the download button on a board row writes a `.perkush.json` file holding that board's pads — the recordings themselves — plus its loop. **Open a board file** reads one back as a new board, so a board can move to another device. The file is written to the device (Files, or the downloads folder); nothing is uploaded.
 - **Change / clear:** tap **Edit**. Each filled pad shows **Change** (opens the picker, so you can re-record or swap instruments) and **Clear** (tap twice to confirm). The other pads are untouched. Tap **Done** to go back to playing.
-- The board is saved in the browser (IndexedDB) after every change, so a reload brings it back.
+- Everything is saved in the browser (IndexedDB) after every change, so a reload brings the boards back.
 
 ## How it works
 
@@ -48,13 +53,15 @@ When Safari asks for the camera and microphone, allow both. To stop Safari askin
 | `index.html`, `home.css`, `js/home.js` | Front page: what it is, how to play, tap-to-hear instruments |
 | `play.html`, `board.css` | The board: 3 columns × 4 rows in portrait, 4 × 3 in landscape |
 | `base.css` | Shared look: colours, scenery, title, buttons, instrument tiles |
-| `js/main.js` | Board UI, sound picker, edit mode, and the render loop that draws each pad's frames |
+| `js/main.js` | Board UI, sound picker, beat bar, boards panel, edit mode, and the render loop that draws each pad's frames |
 | `js/instruments.js` | The 15 cartoon instruments: drawings, synthesised sounds and animations |
 | `js/capture.js` | Recording: camera and mic via `getUserMedia`, sound trigger, silence stop |
 | `js/capture-worklet.js` | AudioWorklet that streams microphone samples to the page |
 | `js/audio.js` | Shared `AudioContext`: low-latency playback and iOS audio unlock |
 | `js/clip.js` | Converts a recording into a playable clip and a storable record, and back |
-| `js/store.js` | IndexedDB: one record per pad |
+| `js/sequencer.js` | The recorded loop and the play-along beat, scheduled ahead on the audio clock |
+| `js/share.js` | Writing a board to a file and reading one back (with validation) |
+| `js/store.js` | IndexedDB: boards, one record per pad, and which board was last open |
 | `serve.py` | Optional: serves the app over HTTPS to devices on your Wi-Fi |
 
 Recording does not use `MediaRecorder`; it captures the raw material directly, which the brief allows ("or equivalent"). An MP4 from `MediaRecorder` has to play through a video element, which isn't built for restarting instantly on every tap or for many pads overlapping. So each pad stores:
@@ -77,4 +84,5 @@ This was tested in iPad Safari on the iOS simulator and in a desktop Chromium br
 ## Limits
 
 - Safari may delete a site's stored data if the site isn't opened for 7 days. Adding the page to the Home Screen avoids that.
-- Everything stays on the device. There is no sharing, export or sync (out of scope for v1).
+- Nothing is uploaded and there is no sync. A board leaves the device only as a file you save and pass on yourself — and that file contains the recordings, so it is worth treating like a home video.
+- A recorded loop is up to 30 seconds and stores taps, not sound: if a pad is changed or cleared, the loop plays whatever is on that pad now.

@@ -23,10 +23,27 @@ const SLOT_COUNT = 48;       // ~1.6 s of frames at 30 fps
 const SHEET_COLS = 6;
 const BLOCK = 256;           // analysis window while recording (samples)
 
+// Silly looks for the camera. The chosen one is drawn into every frame, so what the pad
+// shows while recording is exactly what it keeps.
+export const EFFECTS = [
+  { id: 'none', name: 'Normal' },
+  { id: 'wobble', name: 'Wobbly' },
+  { id: 'rainbow', name: 'Rainbow' },
+  { id: 'big', name: 'Big head' },
+  { id: 'blocks', name: 'Blocky' },
+];
+
+export function effectById(id) {
+  return EFFECTS.find((e) => e.id === id) || EFFECTS[0];
+}
+
 export class CaptureSession {
-  constructor({ video, facing, aspect, frameSize }) {
+  constructor({ video, preview, facing, aspect, frameSize, effect }) {
     this.video = video;
+    this.preview = preview || null;
+    this.previewG = null;
     this.facing = facing;
+    this.effect = effectById(effect).id;
     this.frame = frameDims(aspect, frameSize);
     this.state = 'starting'; // starting → listening → recording → done, or closed
     this.level = 0;
@@ -79,6 +96,10 @@ export class CaptureSession {
   recordNow() {
     if (this.state !== 'listening') return;
     this._begin(Math.round((ctx.currentTime + MANUAL_DELAY) * this.sr), true);
+  }
+
+  setEffect(id) {
+    this.effect = effectById(id).id;
   }
 
   // A finger just touched the screen. That thump must not count as the pad's sound.
@@ -161,9 +182,19 @@ export class CaptureSession {
     this.slotNext = (this.slotNext + 1) % this.slots.length;
     const g = slot.g;
     g.setTransform(this.mirror ? -1 : 1, 0, 0, 1, this.mirror ? w : 0, 0);
-    g.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, w, h);
+    drawFrame(g, video, this.effect, (vw - sw) / 2, (vh - sh) / 2, sw, sh, w, h, wall / 1000);
     slot.t = ctx.currentTime - VIDEO_LAG;
     this.grabbed++;
+    this._paintPreview(slot);
+  }
+
+  // The pad shows the frames we just took rather than the raw camera, so the child sees
+  // the effect they are about to keep.
+  _paintPreview(slot) {
+    const canvas = this.preview;
+    if (!canvas || !canvas.width || !canvas.height) return;
+    if (!this.previewG) this.previewG = canvas.getContext('2d');
+    this.previewG.drawImage(slot.canvas, 0, 0, canvas.width, canvas.height);
   }
 
   // ---- microphone ----
@@ -423,6 +454,66 @@ function waitForVideo(video, aborted, timeout = 8000) {
     };
     check();
   });
+}
+
+// Draws one camera frame into a slot, with whichever silly look is switched on. `t` is a
+// clock in seconds, so the wobble and the colours keep moving while the clip plays back.
+function drawFrame(g, video, effect, sx, sy, sw, sh, w, h, t) {
+  if (effect === 'wobble') {
+    const rows = 16;
+    const amp = w * 0.05;
+    // Each strip is drawn wider than the pad, so sliding it sideways never leaves a gap.
+    for (let i = 0; i < rows; i++) {
+      const off = Math.sin(t * 5 + i * 0.7) * amp;
+      g.drawImage(video, sx, sy + (i * sh) / rows, sw, sh / rows + 1, off - amp, (i * h) / rows, w + amp * 2, h / rows + 1);
+    }
+    return;
+  }
+  if (effect === 'blocks') {
+    const small = scratch(Math.max(8, Math.round(w / 14)), Math.max(8, Math.round(h / 14)));
+    small.g.drawImage(video, sx, sy, sw, sh, 0, 0, small.canvas.width, small.canvas.height);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(small.canvas, 0, 0, w, h);
+    g.imageSmoothingEnabled = true;
+    return;
+  }
+  g.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+  if (effect === 'big') {
+    const cx = w / 2;
+    const cy = h * 0.44;
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, Math.min(w, h) * 0.36, 0, Math.PI * 2);
+    g.clip();
+    g.translate(cx, cy);
+    g.scale(1.6, 1.6);
+    g.translate(-cx, -cy);
+    g.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    g.restore();
+  } else if (effect === 'rainbow') {
+    const previous = g.globalCompositeOperation;
+    g.globalCompositeOperation = 'color'; // keeps the picture's light and dark, swaps the colour
+    if (g.globalCompositeOperation === 'color') {
+      g.fillStyle = `hsl(${Math.round(t * 90) % 360}, 90%, 50%)`;
+      g.fillRect(0, 0, w, h);
+    }
+    g.globalCompositeOperation = previous;
+  }
+}
+
+// One shared little canvas for the blocky effect.
+let scratchCanvas = null;
+
+function scratch(w, h) {
+  if (!scratchCanvas) scratchCanvas = { canvas: document.createElement('canvas'), g: null };
+  const { canvas } = scratchCanvas;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+    scratchCanvas.g = canvas.getContext('2d');
+  }
+  if (!scratchCanvas.g) scratchCanvas.g = canvas.getContext('2d');
+  return scratchCanvas;
 }
 
 function frameDims(aspect, size) {

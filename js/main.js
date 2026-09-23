@@ -1,18 +1,25 @@
-// The board: 12 pads. Tap an empty pad to add a sound (record your own with the camera, or
-// pick a cartoon instrument), tap a filled pad to play it, and use Edit to change or clear
-// pads. The render loop keeps each recorded pad's picture on the audio clock.
+// The board: 12 pads belonging to one of several named boards. Tap an empty pad to add a
+// sound (record your own with the camera, or pick a cartoon instrument), tap a filled pad
+// to play it, and use Edit to change or clear pads. The beat bar records what you play and
+// loops it back, and can keep a drum beat going to play along to. The render loop keeps
+// each recorded pad's picture on the audio clock.
 
 import * as audio from './audio.js';
-import { CaptureSession, captureErrorMessage, countCameras } from './capture.js';
+import { CaptureSession, captureErrorMessage, countCameras, EFFECTS, effectById } from './capture.js';
 import { clipFromCapture, clipFromRecord, releaseClip } from './clip.js';
 import { INSTRUMENTS, instrumentById, instrumentSvg, loadInstruments, tileHtml, animateInstrument } from './instruments.js';
+import { Sequencer } from './sequencer.js';
+import { boardFilename, boardToBlob, cleanName, readBoardFile, saveFile } from './share.js';
 import * as store from './store.js';
 
 const PAD_COUNT = 12;
 const FRAME_SIZE = 256;      // longest side of a stored video frame (px)
 const DISPLAY_LEAD = 0.02;   // a frame drawn now reaches the screen about a refresh later
-const FACING_KEY = 'video-drum-board.facing';
 const BLOCK_DEPTH = 6;       // px; matches --d in board.css
+const FACING_KEY = 'video-drum-board.facing';
+const EFFECT_KEY = 'perkush.effect';
+const SPEED_KEY = 'perkush.speed';
+const NEW_NAMES = ['Kitchen', 'Animals', 'Playground', 'Garden', 'Space', 'Monsters', 'Band', 'Jungle'];
 
 const ICON_CLOSE =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
@@ -25,6 +32,21 @@ const ICON_SWAP =
 const ICON_TRASH =
   '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
   '<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10.5 11v5.5M13.5 11v5.5"/></svg>';
+const ICON_SPARK =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">' +
+  '<path d="M12 2.5l1.9 5.1 5.1 1.9-5.1 1.9L12 16.5l-1.9-5.1L5 9.5l5.1-1.9z"/>' +
+  '<path d="M18.5 15l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9zM5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
+const ICON_PENCIL =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M4 20l4.5-1 9-9a2.5 2.5 0 0 0-3.5-3.5l-9 9z"/><path d="M13.5 7.5l3 3"/></svg>';
+const ICON_SAVE =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M12 3.5v10M8 10l4 4 4-4"/><path d="M4.5 16v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V16"/></svg>';
+const ICON_PLUS =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+const ICON_OPEN =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M3.5 19V6.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v1"/><path d="M3.5 19l2.8-7.5h15L18.5 19z"/></svg>';
 const ICON_CAMERA =
   '<svg viewBox="0 0 48 48" aria-hidden="true">' +
   '<path d="M15 14l3-6h12l3 6" fill="#fff" stroke="#1e2a4a" stroke-width="3" stroke-linejoin="round"/>' +
@@ -35,19 +57,58 @@ const ICON_CAMERA =
 const stage = document.getElementById('stage');
 const board = document.getElementById('board');
 const editButton = document.getElementById('edit');
+const boardsButton = document.getElementById('boards');
+const boardNameEl = document.getElementById('board-name');
+const bar = {
+  root: document.getElementById('beatbar'),
+  rec: document.getElementById('rec'),
+  recText: document.querySelector('#rec .bb-text'),
+  loop: document.getElementById('loopbtn'),
+  loopText: document.querySelector('#loopbtn .bb-text'),
+  wipe: document.getElementById('wipe'),
+  wipeText: document.querySelector('#wipe .bb-text'),
+  beat: document.getElementById('beat'),
+  dots: document.getElementById('dots'),
+  speed: document.getElementById('speed'),
+  hint: document.getElementById('bb-hint'),
+  fill: document.getElementById('bb-fill'),
+};
 const hint = document.getElementById('hint');
 const toastEl = document.getElementById('toast');
 const mascot = document.querySelector('.mascot');
 const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const pads = [];
+let boards = [];             // every board on this device
+let current = null;          // the one on screen
+let boardReady = false;      // false while a board's pads are still coming out of storage
+let boardIo = Promise.resolve();
 let editing = false;
 let capture = null;          // the recording in progress: { pad, session, ui, phase, ... }
 let chooser = null;          // the "add a sound" picker, built on first use
-let facing = loadFacing();
+let sheet = null;            // the boards panel, built on first use
+let facing = readSetting(FACING_KEY) === 'environment' ? 'environment' : 'user';
+let effect = effectById(readSetting(EFFECT_KEY)).id;
 let cameraCount = 2;         // assume a camera switch is possible until we know better
+let beatBuffers = null;      // instrument sounds used by the play-along beat
+let beatLoading = false;
+let wipeTimer = 0;
 let raf = 0;
 let toastTimer = 0;
+
+const seq = new Sequencer({
+  onHit: (index, when) => {
+    const pad = pads[index];
+    if (pad && pad.clip) playPad(pad, when);
+  },
+  onStep: playBeatStep,
+  onChange: renderBar,
+  onLoop: (loop) => {
+    if (!current) return;
+    current.loop = loop;
+    saveBoardRecord(current);
+  },
+});
 
 // ---- pads ----
 
@@ -131,6 +192,7 @@ function onPadClick(pad, e) {
     if (pad !== capture.pad || !button) return;
     if (button.classList.contains('cancel')) cancelCapture();
     else if (button.classList.contains('flip')) flipCamera();
+    else if (button.classList.contains('fx')) cycleEffect(capture);
     return;
   }
   if (button && button.classList.contains('change')) openChooser(pad);
@@ -151,19 +213,37 @@ function onPadKey(pad, e) {
   }
 }
 
+// A child's own tap: play it, and remember it if the red button is on.
 function hit(pad) {
+  playPad(pad);
+  seq.note(pad.index);
+}
+
+// Starts a pad. `when` is a time on the audio clock, so the loop can line hits up ahead of
+// time; the pad's picture and bounce wait until that moment arrives.
+function playPad(pad, when = 0) {
   const clip = pad.clip;
-  pad.voice = { start: audio.play(pad.index, clip.buffer), clip };
+  if (!clip) return;
+  const start = audio.play(pad.index, clip.buffer, when);
+  const voice = { start, clip, fired: false };
+  pad.voice = voice;
+  if (clip.kind !== 'inst' && pad.shown !== 0) drawFrame(pad, 0);
+  if (start <= audio.ctx.currentTime + 0.01) {
+    voice.fired = true;
+    showHit(pad, clip);
+  }
+  kick();
+}
+
+function showHit(pad, clip) {
   pad.el.classList.add('playing');
   press(pad);
   if (clip.kind === 'inst') {
     animateInstrument(pad.instArt, pad.pow, clip.inst, reducedMotion);
-  } else {
-    if (pad.shown !== 0) drawFrame(pad, 0);
-    if (pad.flash.animate) pad.flash.animate([{ opacity: 0.35 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' });
+  } else if (pad.flash.animate) {
+    pad.flash.animate([{ opacity: 0.35 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' });
   }
   hop();
-  kick();
 }
 
 // The block sinks for a moment, like a real button being pushed.
@@ -210,6 +290,31 @@ function installClip(pad, clip) {
   }
 }
 
+// Empties a pad on screen. Storage is left alone: switching boards uses this too.
+function emptyPad(pad, state) {
+  audio.stop(pad.index);
+  pad.voice = null;
+  pad.el.classList.remove('playing');
+  releaseClip(pad.clip);
+  pad.clip = null;
+  pad.shown = -1;
+  pad.g.clearRect(0, 0, pad.canvas.width, pad.canvas.height);
+  pad.instArt.innerHTML = '';
+  pad.instLabel.textContent = '';
+  delete pad.el.dataset.kind;
+  cancelConfirm(pad);
+  setState(pad, state);
+}
+
+function silencePads() {
+  for (const pad of pads) {
+    audio.stop(pad.index);
+    pad.voice = null;
+    pad.el.classList.remove('playing');
+    if (pad.clip && pad.clip.kind !== 'inst') drawFrame(pad, 0);
+  }
+}
+
 // ---- built-in instruments ----
 
 async function instrumentClip(inst) {
@@ -231,8 +336,9 @@ async function assignInstrument(pad, inst) {
   setState(pad, 'filled');
   updateChrome();
   celebrate(pad);
+  const board = current;
   persist(pad, async () => {
-    await store.savePad({ pad: pad.index, v: 1, kind: 'inst', inst: inst.id, created: Date.now() });
+    await store.savePad(board.id, { pad: pad.index, v: 1, kind: 'inst', inst: inst.id, created: Date.now() });
     store.requestPersistence();
   }, `Pad ${pad.index + 1} could not be saved`, 'It will be gone after a reload.');
 }
@@ -384,9 +490,17 @@ function tick() {
       continue;
     }
     again = true;
+    if (t >= 0 && !voice.fired) {
+      voice.fired = true;
+      showHit(pad, voice.clip);
+    }
     if (voice.clip.kind === 'inst') continue;
     const i = t <= 0 ? 0 : frameAt(voice.clip.times, t);
     if (i !== pad.shown) drawFrame(pad, i);
+  }
+  if (seq.recording || seq.playing) {
+    bar.fill.style.transform = `scaleX(${seq.position.toFixed(4)})`;
+    again = true;
   }
   if (capture && !capture.finished) {
     updateCaptureUI(capture);
@@ -399,12 +513,128 @@ function kick() {
   if (!raf) raf = requestAnimationFrame(tick);
 }
 
+// ---- the beat bar ----
+
+function renderBar() {
+  const anyFilled = pads.some((p) => p.clip);
+  bar.root.hidden = !anyFilled && !seq.hasLoop;
+  bar.rec.classList.toggle('on', seq.recording);
+  bar.rec.setAttribute('aria-pressed', String(seq.recording));
+  bar.rec.disabled = !!capture;
+  bar.recText.textContent = seq.recording ? 'Stop' : 'Record';
+  bar.loop.hidden = !seq.hasLoop;
+  bar.loop.disabled = seq.recording || !!capture;
+  bar.loop.dataset.mode = seq.playing ? 'stop' : 'play';
+  bar.loopText.textContent = seq.playing ? 'Stop' : 'Play';
+  bar.wipe.hidden = !seq.hasLoop || seq.recording;
+  bar.beat.classList.toggle('on', seq.beat);
+  bar.beat.setAttribute('aria-pressed', String(seq.beat));
+  bar.beat.disabled = !!capture;
+  bar.dots.hidden = !seq.beat;
+  bar.speed.textContent = seq.speed.name;
+  bar.speed.setAttribute('aria-label', `Beat speed: ${seq.speed.name}. Tap to change.`);
+  bar.hint.textContent =
+    seq.recording ? 'Tap the pads — then tap the red button again' :
+    seq.playing ? 'Your beat is playing. Tap along with it!' :
+    seq.hasLoop ? 'Tap Play to hear your beat again' :
+    'Tap the red button to record what you play';
+  if (!seq.recording && !seq.playing) bar.fill.style.transform = 'scaleX(0)';
+  if (!seq.hasLoop) cancelWipeConfirm();
+  kick();
+}
+
+function toggleRecording() {
+  if (capture) return;
+  audio.unlock();
+  if (!seq.recording) {
+    seq.startRecording();
+    toast('Tap the pads. Tap the red button again when you are done.', 3500);
+    return;
+  }
+  if (!seq.stopRecording()) toast('No pads were tapped, so there is no beat to play.');
+}
+
+function toggleLoop() {
+  audio.unlock();
+  if (seq.playing) {
+    seq.stopPlaying();
+    silencePads();
+  } else {
+    seq.play();
+  }
+}
+
+// Throwing a beat away takes two taps, like clearing a pad.
+function onWipe() {
+  if (!wipeTimer) {
+    bar.wipe.classList.add('confirm');
+    if (bar.wipeText) bar.wipeText.textContent = 'Sure?';
+    bar.wipe.setAttribute('aria-label', 'Tap again to throw the beat away');
+    wipeTimer = setTimeout(cancelWipeConfirm, 3000);
+    return;
+  }
+  cancelWipeConfirm();
+  seq.clear();
+  silencePads();
+}
+
+function cancelWipeConfirm() {
+  clearTimeout(wipeTimer);
+  wipeTimer = 0;
+  bar.wipe.classList.remove('confirm');
+  if (bar.wipeText) bar.wipeText.textContent = 'Clear';
+  bar.wipe.setAttribute('aria-label', 'Throw the beat away');
+}
+
+async function toggleBeat() {
+  if (capture || beatLoading) return;
+  audio.unlock();
+  if (seq.beat) {
+    seq.setBeat(false);
+    return;
+  }
+  // The drum sounds are made the first time they are needed, which takes a moment.
+  if (!beatBuffers) {
+    beatLoading = true;
+    bar.beat.classList.add('loading');
+    try {
+      beatBuffers = await loadInstruments();
+    } catch (err) {
+      toast(`The beat could not start (${errorText(err)}).`);
+      return;
+    } finally {
+      beatLoading = false;
+      bar.beat.classList.remove('loading');
+    }
+  }
+  seq.setBeat(true);
+}
+
+// One eighth note of the play-along beat: boom on 1 and 3, tak on 2 and 4, tick between.
+function playBeatStep(step, when) {
+  if (!beatBuffers) return;
+  audio.play('beat-tick', beatBuffers.get('hihat'), when, step % 2 === 0 ? 0.3 : 0.2);
+  if (step === 0 || step === 4) audio.play('beat-boom', beatBuffers.get('kick'), when, 0.5);
+  if (step === 2 || step === 6) audio.play('beat-tak', beatBuffers.get('snare'), when, 0.4);
+  if (step % 2) return;
+  // Light the matching dot when that beat reaches the speaker.
+  const beat = step / 2;
+  setTimeout(() => {
+    if (!seq.beat) return;
+    for (let i = 0; i < bar.dots.children.length; i++) {
+      bar.dots.children[i].classList.toggle('on', i === beat);
+    }
+  }, Math.max(0, (when - audio.audioNow()) * 1000));
+}
+
 // ---- recording ----
 
 async function startCapture(pad) {
   if (capture) return;
   audio.unlock();
-  audio.stopAll(); // pads still ringing would trigger the recording
+  seq.stopEverything();  // the microphone must not hear the loop or the beat
+  silencePads();
+  audio.stopAll();
   cancelConfirm(pad);
   const job = { pad, session: null, ui: null, phase: 'capturing', restart: false, cancelled: false, finished: false };
   capture = job;
@@ -418,7 +648,14 @@ async function startCapture(pad) {
     do {
       job.restart = false;
       const aspect = pad.canvas.clientWidth / pad.canvas.clientHeight || pad.w / pad.h;
-      const session = new CaptureSession({ video: job.ui.video, facing, aspect, frameSize: FRAME_SIZE });
+      const session = new CaptureSession({
+        video: job.ui.video,
+        preview: job.ui.preview,
+        facing,
+        aspect,
+        frameSize: FRAME_SIZE,
+        effect,
+      });
       job.session = session;
       session.onstate = (state) => onSessionState(job, state);
       job.ui.video.classList.toggle('mirror', facing === 'user');
@@ -436,10 +673,11 @@ async function startCapture(pad) {
     const { clip, encode } = await clipFromCapture(result);
     installClip(pad, clip);
     celebrate(pad);
+    const board = current;
     persist(pad, async () => {
       const record = await encode();
       record.pad = pad.index;
-      await store.savePad(record);
+      await store.savePad(board.id, record);
       store.requestPersistence();
     }, `Recorded, but pad ${pad.index + 1} could not be saved`, 'It will be gone after a reload.');
   } catch (err) {
@@ -486,9 +724,25 @@ function flipCamera() {
   const job = capture;
   if (!job || job.phase !== 'capturing' || !job.session || job.session.state === 'recording') return;
   facing = facing === 'user' ? 'environment' : 'user';
-  saveFacing(facing);
+  writeSetting(FACING_KEY, facing);
   job.restart = true;
   job.session.cancel();
+}
+
+// The sparkle button walks through the silly looks; whatever is on screen is what the
+// pad keeps.
+function cycleEffect(job) {
+  if (!job || job.phase !== 'capturing') return;
+  const i = EFFECTS.findIndex((e) => e.id === effect);
+  const next = EFFECTS[(i + 1) % EFFECTS.length];
+  effect = next.id;
+  writeSetting(EFFECT_KEY, effect);
+  if (job.session) job.session.setEffect(effect);
+  job.ui.fx.setAttribute('aria-label', `Silly look: ${next.name}. Tap to change.`);
+  job.ui.fxName.textContent = next.name;
+  job.ui.fxName.classList.remove('show');
+  void job.ui.fxName.offsetWidth; // restart the little pop
+  job.ui.fxName.classList.add('show');
 }
 
 function refreshCameraCount(job) {
@@ -503,10 +757,15 @@ function mountCaptureUI(pad) {
   root.className = 'capture';
   root.innerHTML =
     '<video autoplay muted playsinline></video>' +
+    '<canvas class="preview"></canvas>' +
     '<div class="cap-top">' +
     `<button type="button" class="round cancel" aria-label="Cancel recording">${ICON_CLOSE}</button>` +
+    '<div class="cap-tools">' +
     `<button type="button" class="round flip" aria-label="Switch camera">${ICON_FLIP}</button>` +
+    `<button type="button" class="round fx" aria-label="Silly look: ${effectById(effect).name}. Tap to change.">${ICON_SPARK}</button>` +
     '</div>' +
+    '</div>' +
+    '<div class="fx-name" aria-hidden="true"></div>' +
     '<div class="cap-bottom">' +
     '<div class="rec-badge" aria-hidden="true">REC</div>' +
     '<div class="cap-msg" role="status"></div>' +
@@ -519,10 +778,18 @@ function mountCaptureUI(pad) {
   const flip = root.querySelector('.flip');
   flip.hidden = cameraCount < 2;
   pad.el.appendChild(root);
+  // The preview shows the frames being kept, effect and all, rather than the raw camera.
+  const preview = root.querySelector('.preview');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  preview.width = Math.max(2, Math.round(preview.clientWidth * dpr));
+  preview.height = Math.max(2, Math.round(preview.clientHeight * dpr));
   return {
     root,
     video,
+    preview,
     flip,
+    fx: root.querySelector('.fx'),
+    fxName: root.querySelector('.fx-name'),
     msg: root.querySelector('.cap-msg'),
     fill: root.querySelector('.meter-fill'),
     mark: root.querySelector('.meter-mark'),
@@ -586,18 +853,10 @@ function cancelConfirm(pad) {
 }
 
 function clearPad(pad) {
-  audio.stop(pad.index);
-  pad.voice = null;
-  pad.el.classList.remove('playing');
-  releaseClip(pad.clip);
-  pad.clip = null;
-  pad.shown = -1;
-  pad.g.clearRect(0, 0, pad.canvas.width, pad.canvas.height);
-  pad.instArt.innerHTML = '';
-  delete pad.el.dataset.kind;
-  setState(pad, 'empty');
+  emptyPad(pad, 'empty');
   updateChrome();
-  persist(pad, () => store.deletePad(pad.index), `Pad ${pad.index + 1} could not be cleared from storage`, 'It may come back after a reload.');
+  const board = current;
+  persist(pad, () => store.deletePad(board.id, pad.index), `Pad ${pad.index + 1} could not be cleared from storage`, 'It may come back after a reload.');
 }
 
 // Storage work for a pad runs in order, so a quick clear or change can't be undone by an
@@ -613,11 +872,336 @@ function updateChrome() {
     return;
   }
   editButton.disabled = !!capture || !anyFilled;
+  boardsButton.disabled = !!capture;
+  const count = pads.filter((p) => p.clip).length;
+  if (boardReady && current && current.count !== count && !capture) {
+    current.count = count;
+    saveBoardRecord(current);
+  }
   hint.textContent = capture
     ? `Recording pad ${capture.pad.index + 1}: make a sound, or tap the pad.`
     : editing
       ? 'Change or clear pads. Tap Done when finished.'
       : 'Tap an empty pad to add a sound. Tap a filled pad to play it.';
+  renderBar();
+}
+
+// ---- boards ----
+
+function makeBoardId() {
+  return `board-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function boardData(b) {
+  return { id: b.id, name: b.name, created: b.created || Date.now(), loop: b.loop || null, count: b.count || 0 };
+}
+
+// Board writes run in order too, so a rename can't be overwritten by an earlier save.
+function saveBoardRecord(b) {
+  const data = boardData(b);
+  boardIo = boardIo
+    .then(() => store.saveBoard(data))
+    .catch((err) => toast(`The board could not be saved (${errorText(err)}).`));
+  return boardIo;
+}
+
+function nextBoardName() {
+  const taken = new Set(boards.map((b) => b.name.toLowerCase()));
+  const free = NEW_NAMES.find((n) => !taken.has(n.toLowerCase()));
+  if (free) return free;
+  let n = boards.length + 1;
+  while (taken.has(`board ${n}`)) n++;
+  return `Board ${n}`;
+}
+
+// Puts a board on screen: pads are emptied, then filled from storage.
+async function openBoard(b) {
+  seq.stopEverything();
+  silencePads();
+  cancelWipeConfirm();
+  if (editing) setEditing(false);
+  current = b;
+  boardReady = false;
+  boardNameEl.textContent = b.name;
+  boardsButton.setAttribute('aria-label', `Board: ${b.name}. Tap to switch boards.`);
+  for (const pad of pads) emptyPad(pad, 'loading');
+  seq.setLoop(b.loop);
+  updateChrome();
+  store.setCurrentBoardId(b.id).catch(() => {});
+
+  let records = [];
+  try {
+    records = await store.loadPads(b.id);
+  } catch (err) {
+    toast(`The saved pads could not be loaded (${errorText(err)}).`);
+  }
+  if (current !== b) return; // switched again while this was loading
+  await Promise.all(records.map(async (record) => {
+    const pad = pads[record.pad];
+    if (!pad || pad.clip || (capture && capture.pad === pad)) return;
+    try {
+      const clip = await restore(record);
+      if (current === b && !pad.clip) installClip(pad, clip);
+      else releaseClip(clip);
+    } catch (err) {
+      console.warn(`Pad ${record.pad + 1} could not be restored`, err);
+    }
+  }));
+  if (current !== b) return;
+  for (const pad of pads) {
+    if (pad.el.dataset.state === 'loading') setState(pad, pad.clip ? 'filled' : 'empty');
+  }
+  boardReady = true;
+  updateChrome();
+}
+
+async function newBoard(name) {
+  const b = { id: makeBoardId(), name: cleanName(name || nextBoardName()), created: Date.now(), loop: null, count: 0 };
+  boards.push(b);
+  await saveBoardRecord(b);
+  return b;
+}
+
+async function removeBoard(b) {
+  const others = boards.filter((x) => x.id !== b.id);
+  if (!others.length) return;
+  boards = others;
+  try {
+    await store.deleteBoard(b.id);
+  } catch (err) {
+    toast(`“${b.name}” could not be deleted (${errorText(err)}).`);
+  }
+  if (current && current.id === b.id) await openBoard(boards[0]);
+  renderBoardList();
+}
+
+// ---- the boards panel ----
+
+function buildSheet() {
+  const root = document.createElement('div');
+  root.className = 'chooser sheet';
+  root.hidden = true;
+  root.innerHTML =
+    '<div class="chooser-card sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-title">' +
+    '<div class="chooser-head">' +
+    '<h2 id="sheet-title">Your boards</h2>' +
+    `<button type="button" class="round sheet-close" aria-label="Close">${ICON_CLOSE}</button>` +
+    '</div>' +
+    '<div class="board-list"></div>' +
+    '<div class="sheet-actions">' +
+    `<button type="button" class="btn add-board">${ICON_PLUS}<span>New board</span></button>` +
+    `<button type="button" class="btn open-board">${ICON_OPEN}<span>Open a board file</span></button>` +
+    '</div>' +
+    '<p class="sheet-note">A board file keeps the pictures and sounds you recorded. It is saved on this device — nothing is sent anywhere — so only pass one on to someone you trust.</p>' +
+    '<input type="file" class="board-file" accept=".json,application/json" hidden>' +
+    '</div>';
+  document.body.appendChild(root);
+
+  const s = {
+    root,
+    list: root.querySelector('.board-list'),
+    file: root.querySelector('.board-file'),
+    renaming: null,
+    confirmId: null,
+    confirmTimer: 0,
+  };
+
+  root.addEventListener('click', (e) => {
+    if (e.target === root || e.target.closest('.sheet-close')) closeSheet();
+  });
+  root.querySelector('.add-board').addEventListener('click', async () => {
+    const b = await newBoard();
+    closeSheet();
+    await openBoard(b);
+    toast(`“${b.name}” is empty and waiting. Tap a pad to fill it.`);
+  });
+  root.querySelector('.open-board').addEventListener('click', () => s.file.click());
+  s.file.addEventListener('change', () => {
+    const file = s.file.files && s.file.files[0];
+    s.file.value = '';
+    if (file) importBoardFile(file);
+  });
+  s.list.addEventListener('click', onSheetClick);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !root.hidden) closeSheet();
+  });
+  return s;
+}
+
+function openSheet() {
+  if (capture) return;
+  if (!sheet) sheet = buildSheet();
+  audio.unlock();
+  renderBoardList();
+  sheet.root.hidden = false;
+  const active = sheet.list.querySelector('.board-row.active .row-open');
+  if (active) active.focus({ preventScroll: true });
+}
+
+function closeSheet() {
+  if (!sheet || sheet.root.hidden) return;
+  stopRename(false);
+  clearConfirm();
+  sheet.root.hidden = true;
+  boardsButton.focus({ preventScroll: true });
+}
+
+function renderBoardList() {
+  if (!sheet) return;
+  clearConfirm();
+  const only = boards.length < 2;
+  sheet.list.innerHTML = boards.map((b) => {
+    const active = current && b.id === current.id;
+    const sounds = b.count === 1 ? '1 sound' : `${b.count || 0} sounds`;
+    const beat = b.loop ? ' · has a beat' : '';
+    return (
+      `<div class="board-row${active ? ' active' : ''}" data-id="${b.id}">` +
+      `<button type="button" class="row-open"${active ? ' aria-current="true"' : ''}>` +
+      `<span class="row-name">${escapeHtml(b.name)}</span>` +
+      `<small class="row-sub">${sounds}${beat}${active ? ' · open' : ''}</small>` +
+      '</button>' +
+      `<button type="button" class="round tiny act rename" aria-label="Rename ${escapeHtml(b.name)}">${ICON_PENCIL}</button>` +
+      `<button type="button" class="round tiny act save" aria-label="Save ${escapeHtml(b.name)} to a file">${ICON_SAVE}</button>` +
+      `<button type="button" class="round tiny act remove" aria-label="Delete ${escapeHtml(b.name)}"${only ? ' disabled' : ''}>${ICON_TRASH}</button>` +
+      '</div>'
+    );
+  }).join('');
+}
+
+function onSheetClick(e) {
+  const row = e.target.closest('.board-row');
+  if (!row) return;
+  const b = boards.find((x) => x.id === row.dataset.id);
+  if (!b) return;
+  const button = e.target.closest('button');
+  if (!button) return;
+  if (!button.classList.contains('remove')) clearConfirm();
+  if (button.classList.contains('row-open')) {
+    closeSheet();
+    if (!current || b.id !== current.id) openBoard(b);
+  } else if (button.classList.contains('rename')) {
+    startRename(row, b);
+  } else if (button.classList.contains('save')) {
+    exportBoard(b);
+  } else if (button.classList.contains('remove')) {
+    confirmRemove(button, b);
+  }
+}
+
+// Deleting a board holds everything that was recorded on it, so it takes two taps.
+function confirmRemove(button, b) {
+  if (sheet.confirmId !== b.id) {
+    clearConfirm();
+    sheet.confirmId = b.id;
+    button.classList.add('confirm');
+    button.setAttribute('aria-label', `Tap again to delete ${b.name} and everything on it`);
+    sheet.confirmTimer = setTimeout(clearConfirm, 3000);
+    return;
+  }
+  clearConfirm();
+  removeBoard(b);
+}
+
+function clearConfirm() {
+  if (!sheet) return;
+  clearTimeout(sheet.confirmTimer);
+  sheet.confirmTimer = 0;
+  sheet.confirmId = null;
+  for (const button of sheet.list.querySelectorAll('.remove.confirm')) {
+    const row = button.closest('.board-row');
+    const b = boards.find((x) => x.id === (row && row.dataset.id));
+    button.classList.remove('confirm');
+    if (b) button.setAttribute('aria-label', `Delete ${b.name}`);
+  }
+}
+
+function startRename(row, b) {
+  stopRename(false);
+  // The list may have been redrawn by the rename we just closed, so find the live row.
+  const live = sheet.list.querySelector(`.board-row[data-id="${b.id}"]`) || row;
+  const nameEl = live.querySelector('.row-name');
+  if (!nameEl) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'row-input';
+  input.value = b.name;
+  input.maxLength = 40;
+  input.setAttribute('aria-label', `Name for ${b.name}`);
+  nameEl.replaceWith(input);
+  sheet.renaming = { input, board: b };
+  input.focus();
+  input.select();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') stopRename(true);
+    else if (e.key === 'Escape') stopRename(false);
+  });
+  input.addEventListener('blur', () => stopRename(true));
+}
+
+function stopRename(save) {
+  if (!sheet || !sheet.renaming) return;
+  const { input, board: b } = sheet.renaming;
+  sheet.renaming = null;
+  const name = cleanName(input.value);
+  if (save && name !== b.name) {
+    b.name = name;
+    saveBoardRecord(b);
+    if (current && current.id === b.id) {
+      boardNameEl.textContent = name;
+      boardsButton.setAttribute('aria-label', `Board: ${name}. Tap to switch boards.`);
+    }
+  }
+  renderBoardList();
+}
+
+// ---- board files ----
+
+async function exportBoard(b) {
+  try {
+    if (current && b.id === current.id) await Promise.all(pads.map((p) => p.io)); // let saves land first
+    const records = await store.loadPads(b.id);
+    if (!records.length) {
+      toast(`“${b.name}” has no sounds on it yet.`);
+      return;
+    }
+    saveFile(boardToBlob(b, records), boardFilename(b.name));
+    toast(`“${b.name}” was saved as a file. It has the recordings in it, so keep it safe.`, 8000);
+  } catch (err) {
+    toast(`“${b.name}” could not be saved to a file (${errorText(err)}).`);
+  }
+}
+
+async function importBoardFile(file) {
+  let data;
+  try {
+    data = await readBoardFile(file, PAD_COUNT);
+  } catch (err) {
+    toast(`That file could not be opened: ${errorText(err)}.`);
+    return;
+  }
+  let b;
+  try {
+    b = await newBoard(uniqueName(data.name));
+    b.loop = data.loop;
+    b.count = data.pads.length;
+    for (const record of data.pads) await store.savePad(b.id, record);
+    await saveBoardRecord(b);
+    store.requestPersistence();
+  } catch (err) {
+    toast(`That board could not be added (${errorText(err)}).`);
+    return;
+  }
+  closeSheet();
+  await openBoard(b);
+  toast(`“${b.name}” is ready. Tap the pads!`);
+}
+
+function uniqueName(name) {
+  const taken = new Set(boards.map((b) => b.name.toLowerCase()));
+  let candidate = cleanName(name);
+  let n = 2;
+  while (taken.has(candidate.toLowerCase())) candidate = `${cleanName(name)} ${n++}`;
+  return candidate;
 }
 
 // ---- layout ----
@@ -672,19 +1256,25 @@ function errorText(err) {
   return (err && (err.message || err.name)) || String(err);
 }
 
-function loadFacing() {
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function readSetting(key) {
   try {
-    return localStorage.getItem(FACING_KEY) === 'environment' ? 'environment' : 'user';
+    return localStorage.getItem(key);
   } catch (err) {
-    return 'user';
+    return null; // private mode or storage blocked
   }
 }
 
-function saveFacing(value) {
+function writeSetting(key, value) {
   try {
-    localStorage.setItem(FACING_KEY, value);
+    localStorage.setItem(key, value);
   } catch (err) {
-    // Private mode or storage blocked: just don't remember it.
+    // Just don't remember it.
   }
 }
 
@@ -695,6 +1285,25 @@ async function restore(record) {
     return instrumentClip(inst);
   }
   return clipFromRecord(record);
+}
+
+// The board that was open last time, or a brand new one.
+async function firstBoard() {
+  try {
+    boards = (await store.loadBoards()) || [];
+  } catch (err) {
+    toast(`The saved boards could not be loaded (${errorText(err)}).`);
+    boards = [];
+  }
+  boards.sort((a, b) => (a.created || 0) - (b.created || 0));
+  if (!boards.length) return newBoard('My board');
+  let id = null;
+  try {
+    id = await store.currentBoardId();
+  } catch (err) {
+    // Fall back to the first board.
+  }
+  return boards.find((b) => b.id === id) || boards[0];
 }
 
 async function boot() {
@@ -708,6 +1317,17 @@ async function boot() {
   else window.addEventListener('resize', layout);
 
   editButton.addEventListener('click', () => setEditing(!editing));
+  boardsButton.addEventListener('click', openSheet);
+  bar.rec.addEventListener('click', toggleRecording);
+  bar.loop.addEventListener('click', toggleLoop);
+  bar.wipe.addEventListener('click', onWipe);
+  bar.beat.addEventListener('click', toggleBeat);
+  bar.speed.addEventListener('click', () => {
+    seq.nextSpeed();
+    writeSetting(SPEED_KEY, seq.speed.id);
+  });
+  seq.setSpeed(readSetting(SPEED_KEY) || 'medium');
+
   // Any touch while recording is a thump the microphone hears; the session ignores it.
   document.addEventListener('pointerdown', () => {
     if (capture && capture.session) capture.session.noteTouch();
@@ -716,33 +1336,19 @@ async function boot() {
   document.addEventListener('touchstart', () => {}, { passive: true }); // lets iOS show :active presses
   board.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) cancelCapture();
+    if (!document.hidden) return;
+    // A hidden tab's timers are throttled, which would make the loop stutter.
+    cancelCapture();
+    seq.stopEverything();
+    silencePads();
   });
   updateChrome();
   audio.loadWorklet();
   if (!window.isSecureContext) toast('Open this page over HTTPS to record with the camera and microphone.', 15000);
 
-  let records = [];
-  try {
-    records = await store.loadPads();
-  } catch (err) {
-    toast(`Saved pads could not be loaded (${errorText(err)}).`);
-  }
-  await Promise.all(records.map(async (record) => {
-    const pad = pads[record.pad];
-    if (!pad || pad.clip || (capture && capture.pad === pad)) return;
-    try {
-      installClip(pad, await restore(record));
-    } catch (err) {
-      console.warn(`Pad ${record.pad + 1} could not be restored`, err);
-    }
-  }));
-  for (const pad of pads) {
-    if (pad.el.dataset.state === 'loading') setState(pad, pad.clip ? 'filled' : 'empty');
-  }
-  updateChrome();
+  await openBoard(await firstBoard());
   // Get the instrument sounds ready in the background.
-  setTimeout(() => loadInstruments().catch(() => {}), 1200);
+  setTimeout(() => loadInstruments().then((b) => { beatBuffers = b; }, () => {}), 1200);
 }
 
 boot();

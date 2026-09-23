@@ -77,13 +77,15 @@ export function audioNow() {
 }
 
 // Starts a pad from the top, cutting off (with a short fade) whatever it was playing.
-// Returns the context time the sound starts at.
-export function play(key, buffer) {
-  const now = ctx.currentTime;
+// `when` schedules it ahead on the audio clock (the loop and the beat do that); `level`
+// keeps the play-along beat under the pads. Returns the context time the sound starts at.
+export function play(key, buffer, when = 0, level = 1) {
+  const now = Math.max(when || 0, ctx.currentTime);
   stop(key, now);
   const src = ctx.createBufferSource();
   src.buffer = buffer;
   const gain = ctx.createGain();
+  if (level !== 1) gain.gain.value = level;
   src.connect(gain);
   gain.connect(master);
   src.start(now);
