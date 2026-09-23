@@ -10,6 +10,7 @@ const LEAD_IN = 0.12;    // a breath before a loop starts
 const MIN_LOOP = 0.5;
 const MAX_LOOP = 30;
 const TAIL = 0.15;       // the loop never ends right on top of its last hit
+export const COUNT = 4;  // beats counted in before recording starts
 export const STEPS = 8;  // eighth notes in one bar of the beat
 
 export const SPEEDS = [
@@ -19,21 +20,26 @@ export const SPEEDS = [
 ];
 
 export class Sequencer {
-  // onHit(pad, when) plays a pad; onStep(step, when) is one eighth note of the beat;
+  // onHit(pad, when) plays a pad; onCount(left, when) is one beat of the count-in;
+  // onStep(step, when) is one eighth note of the beat;
   // onChange() means the buttons need redrawing; onLoop(loop) means the recorded beat
   // itself changed and the board should keep the new one.
-  constructor({ onHit, onStep, onChange, onLoop }) {
+  constructor({ onHit, onCount, onStep, onChange, onLoop }) {
     this.onHit = onHit;
+    this.onCount = onCount || (() => {});
     this.onStep = onStep;
     this.onChange = onChange || (() => {});
     this.onLoop = onLoop || (() => {});
-    this.state = 'idle';   // idle | recording | playing
+    this.state = 'idle';   // idle | counting | recording | playing
     this.loop = null;      // { duration, hits: [{ pad, t }] }
     this.beat = false;
     this.speed = SPEEDS[1];
     this.hits = [];
     this.timer = 0;
     this.recStart = 0;
+    this.countFrom = 0;
+    this.countNext = 0;
+    this.countQuarter = 0.625;
     this.cycleStart = 0;
     this.next = 0;
     this.step = 0;
@@ -41,6 +47,7 @@ export class Sequencer {
   }
 
   get recording() { return this.state === 'recording'; }
+  get counting() { return this.state === 'counting'; }
   get playing() { return this.state === 'playing'; }
   get hasLoop() { return !!(this.loop && this.loop.hits.length); }
 
@@ -48,27 +55,62 @@ export class Sequencer {
   get position() {
     if (this.state === 'playing') return clamp((ctx.currentTime - this.cycleStart) / this.loop.duration);
     if (this.state === 'recording') return clamp((ctx.currentTime - this.recStart) / MAX_LOOP);
+    if (this.state === 'counting') {
+      return clamp((ctx.currentTime - this.countFrom) / (COUNT * this.countQuarter));
+    }
     return 0;
   }
 
+  // Counts four beats aloud, then records. If the play-along beat is running, the count
+  // falls in with it, so the recording starts on a beat rather than between two.
   startRecording() {
     this.stopPlaying();
     this.hits = [];
+    this.countQuarter = 60 / this.speed.bpm;
+    this.countFrom = this.beat ? this._nextQuarter() : ctx.currentTime + 0.3;
+    this.countNext = 0;
+    this.recStart = this.countFrom + COUNT * this.countQuarter;
+    this.state = 'counting';
+    this._run();
+    this.onChange();
+  }
+
+  // Waiting is for grown-ups: a tap during the count starts the recording there and then.
+  recordNow() {
+    if (this.state !== 'counting') return;
     this.recStart = ctx.currentTime;
     this.state = 'recording';
-    this._run();
     this.onChange();
   }
 
   // Every pad a child taps while the red button is on goes into the loop.
   note(pad) {
+    if (this.state === 'counting') this.recordNow();
     if (this.state !== 'recording') return;
-    const t = ctx.currentTime - this.recStart;
+    const t = Math.max(0, ctx.currentTime - this.recStart);
     if (t <= MAX_LOOP) this.hits.push({ pad, t });
+  }
+
+  // The next quarter note of the running beat, so the count-in lands on it.
+  _nextQuarter() {
+    const eighth = 30 / this.speed.bpm;
+    let at = this.stepAt;
+    let step = this.step;
+    while (step % 2) {
+      at += eighth;
+      step++;
+    }
+    return at;
   }
 
   // Stops recording and starts playing what was just tapped.
   stopRecording() {
+    if (this.state === 'counting') {  // stopped before it even began
+      this.state = 'idle';
+      this._idle();
+      this.onChange();
+      return null;
+    }
     if (this.state !== 'recording') return null;
     const hits = this.hits;
     const last = hits.length ? hits[hits.length - 1].t : 0;
@@ -90,7 +132,7 @@ export class Sequencer {
   }
 
   play() {
-    if (this.state === 'recording' || !this.hasLoop) return;
+    if (this.state === 'recording' || this.state === 'counting' || !this.hasLoop) return;
     this.cycleStart = ctx.currentTime + LEAD_IN;
     this.next = 0;
     this.state = 'playing';
@@ -169,6 +211,18 @@ export class Sequencer {
 
   _tick() {
     const horizon = ctx.currentTime + LOOKAHEAD;
+    if (this.state === 'counting') {
+      while (this.countNext < COUNT) {
+        const when = this.countFrom + this.countNext * this.countQuarter;
+        if (when >= horizon) break;
+        this.countNext++;
+        this.onCount(COUNT - this.countNext + 1, Math.max(when, ctx.currentTime));
+      }
+      if (ctx.currentTime >= this.recStart) {
+        this.state = 'recording';
+        this.onChange();
+      }
+    }
     // Nobody wants a half-hour beat: a long recording stops itself.
     if (this.state === 'recording' && ctx.currentTime - this.recStart >= MAX_LOOP) {
       this.stopRecording();

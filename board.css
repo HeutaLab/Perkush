@@ -227,6 +227,17 @@ body.board {
   86% { transform: none; box-shadow: 0 4px 0 var(--ink); }
 }
 
+/* Counting in: amber and numbered, so "get ready" never looks like "recording". */
+.bb.rec.counting {
+  background: var(--orange);
+}
+
+.bb.rec.counting .bb-text {
+  min-width: 1.1em;
+  font-size: 22px;
+  text-align: center;
+}
+
 .bb.rec.on {
   animation: rec-pulse 1.1s ease-in-out infinite;
 }
@@ -1080,31 +1091,31 @@ body.board {
   .inst-tile { font-size: 12px; }
 }
 
+/* Narrower than this, the status line only has room to be an ellipsis. */
+@media (max-width: 900px) {
+  .bb-hint { visibility: hidden; }
+}
+
 @media (max-width: 600px) {
   .topbar .pill { height: 40px; min-width: 76px; padding: 0 14px; font-size: 17px; }
   .board-pill { min-width: 0; padding: 0 8px 0 12px; }
   /* the drum alone stands in for the title, leaving room for the board name */
   .topbar .letters { display: none; }
-  .beatbar { gap: 4px; padding: 6px 7px 9px; }
-  .bb-hint { padding: 0; }
+  /* Two rows rather than a squeeze, so every button keeps its words. */
+  .beatbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 8px 11px;
+    border-radius: 26px;
+  }
+  .bb-hint { display: none; }
   .coach { left: 8px; font-size: 15px; padding: 8px 13px 10px; }
-  .bb { height: 40px; min-width: 40px; padding: 0 8px; font-size: 15px; }
-  .bb .bb-text { display: none; }
-  .bb.rec { height: 46px; padding: 0 12px 0 10px; font-size: 16px; }
-  .bb.rec .bb-text { display: inline; }   /* the one label worth the room */
-  .beat-dots { display: none; }           /* no room beside the bigger red button */
-  /* the speed only means anything while the beat is playing */
-  .beatbar:not(.beat-on) .bb.speed { display: none; }
-  .bb.speed { min-width: 52px; padding: 0 8px; }
+  .bb { height: 40px; min-width: 40px; padding: 0 11px; font-size: 15px; }
+  .bb.rec { height: 46px; padding: 0 14px 0 11px; font-size: 16px; }
+  .bb.speed { min-width: 56px; padding: 0 10px; }
   .bb.speed .s-long { display: none; }
   .bb.speed .s-short { display: inline; }
-  /* no room for the words, but the hint still holds the two groups apart */
-  .bb-hint { visibility: hidden; }
-}
-
-/* Very narrow phones: the beat keeps whatever speed it had, rather than squeezing the bar. */
-@media (max-width: 360px) {
-  .beatbar .bb.speed { display: none; }
 }
 
 @media (min-width: 700px) {

@@ -81,8 +81,8 @@
 
     <div class="bar-wrap">
     <div class="beatbar" id="beatbar" hidden>
-      <button type="button" class="bb rec" id="rec" aria-pressed="false" aria-label="Record what you play">
-        <span class="rec-dot" aria-hidden="true"></span><span class="bb-text">Record</span>
+      <button type="button" class="bb rec" id="rec" aria-pressed="false" aria-label="Make a beat: record what you play">
+        <span class="rec-dot" aria-hidden="true"></span><span class="bb-text">Make a beat</span>
       </button>
       <button type="button" class="bb loop" id="loopbtn" data-mode="play" hidden>
         <svg class="bb-i play-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5l12 7.5-12 7.5z" fill="currentColor"/></svg>
@@ -94,15 +94,15 @@
         <span class="bb-text">Clear</span>
       </button>
       <span class="bb-hint" id="bb-hint" aria-hidden="true"></span>
-      <button type="button" class="bb beat" id="beat" aria-pressed="false" aria-label="Play a beat to drum along to">
+      <button type="button" class="bb beat" id="beat" aria-pressed="false" aria-label="Drum along: play a steady beat to follow">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M10.5 3.5l8-1.6v3.3l-6 1.2v9.3a3.5 3.5 0 1 1-2-3.2z"/></svg>
-        <span class="bb-text">Beat</span>
+        <span class="bb-text">Drum along</span>
       </button>
       <div class="beat-dots" id="dots" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <button type="button" class="bb speed" id="speed"><span class="s-long">Medium</span><span class="s-short">Med</span></button>
       <div class="bb-line" aria-hidden="true"><div id="bb-fill"></div></div>
     </div>
-    <p class="coach" id="coach" aria-hidden="true" hidden>Tap me to record what you play!</p>
+    <p class="coach" id="coach" aria-hidden="true" hidden>Tap me to make a beat!</p>
     </div>
 
     <main id="stage">

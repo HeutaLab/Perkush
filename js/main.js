@@ -8,7 +8,7 @@ import * as audio from './audio.js';
 import { CaptureSession, captureErrorMessage, countCameras, EFFECTS, effectById } from './capture.js';
 import { clipFromCapture, clipFromRecord, releaseClip } from './clip.js';
 import { INSTRUMENTS, instrumentById, instrumentSvg, loadInstruments, tileHtml, animateInstrument } from './instruments.js';
-import { Sequencer } from './sequencer.js';
+import { COUNT, Sequencer } from './sequencer.js';
 import { boardFilename, boardToBlob, cleanName, readBoardFile, saveFile } from './share.js';
 import * as store from './store.js';
 
@@ -109,6 +109,7 @@ const seq = new Sequencer({
     const pad = pads[index];
     if (pad && pad.clip) playPad(pad, when);
   },
+  onCount: countIn,
   onStep: playBeatStep,
   onChange: renderBar,
   onLoop: (loop) => {
@@ -534,30 +535,36 @@ function renderBar() {
   bar.root.hidden = !anyFilled && !seq.hasLoop;
   bar.root.classList.toggle('taking', seq.recording);
   // Until a child has made a beat once, the button waves and the hint points at it.
-  const teaching = !recorded && anyFilled && !seq.recording && !seq.hasLoop && !capture;
+  const teaching = !recorded && anyFilled && !seq.recording && !seq.counting && !seq.hasLoop && !capture;
   bar.rec.classList.toggle('nudge', teaching);
   bar.coach.hidden = !teaching || coachOff;
   // It has said its piece after half a minute, and the button keeps waving on its own.
   if (!bar.coach.hidden && !coachTimer) coachTimer = setTimeout(hideCoach, 30000);
   bar.rec.classList.toggle('on', seq.recording);
-  bar.rec.setAttribute('aria-pressed', String(seq.recording));
+  bar.rec.classList.toggle('counting', seq.counting);
+  bar.rec.setAttribute('aria-pressed', String(seq.recording || seq.counting));
   bar.rec.disabled = !!capture;
-  bar.recText.textContent = seq.recording ? 'Stop' : 'Record';
+  if (!seq.counting) bar.recText.textContent = seq.recording ? 'Stop' : 'Make a beat';
+  bar.rec.setAttribute('aria-label',
+    seq.recording ? 'Stop recording your beat' :
+    seq.counting ? 'Counting in — tap to start now' :
+    'Make a beat: record what you play');
   bar.loop.hidden = !seq.hasLoop;
-  bar.loop.disabled = seq.recording || !!capture;
+  bar.loop.disabled = seq.recording || seq.counting || !!capture;
   bar.loop.dataset.mode = seq.playing ? 'stop' : 'play';
   bar.loopText.textContent = seq.playing ? 'Stop' : 'Play';
-  bar.wipe.hidden = !seq.hasLoop || seq.recording;
+  bar.wipe.hidden = !seq.hasLoop || seq.recording || seq.counting;
   bar.beat.classList.toggle('on', seq.beat);
   bar.beat.setAttribute('aria-pressed', String(seq.beat));
   bar.beat.disabled = !!capture;
-  bar.dots.hidden = !seq.beat;
+  bar.dots.hidden = !seq.beat && !seq.counting;
   bar.speedLong.textContent = seq.speed.name;
   bar.speedShort.textContent = seq.speed.short;
   bar.speed.setAttribute('aria-label', `Beat speed: ${seq.speed.name}. Tap to change.`);
   bar.root.classList.toggle('beat-on', seq.beat);
   // A quiet status line; the bubble under the button does the teaching.
   bar.hint.textContent =
+    seq.counting ? 'Get ready…' :
     seq.recording ? 'Tap your pads!' :
     seq.playing ? 'Your beat is looping' : '';
   if (!seq.recording && !seq.playing) bar.fill.style.transform = 'scaleX(0)';
@@ -568,12 +575,29 @@ function renderBar() {
 function toggleRecording() {
   if (capture) return;
   audio.unlock();
-  if (!seq.recording) {
-    seq.startRecording();
-    toast('Tap the pads. Tap the red button again when you are done.', 3500);
+  if (seq.counting) {       // impatient: start right now instead of waiting for the count
+    seq.recordNow();
     return;
   }
-  if (!seq.stopRecording()) toast('No pads were tapped, so there is no beat to play.');
+  if (!seq.recording) {
+    if (!beatBuffers) loadInstruments().then((b) => { beatBuffers = b; }, () => {});
+    seq.startRecording();
+    if (!recorded) toast('Count along — then tap your pads!', 3000);
+    return;
+  }
+  if (!seq.stopRecording()) toast('No pads were tapped, so there is no beat yet. Have another go!');
+}
+
+// One beat of the count-in: a knock, a number on the button, and one dot going out.
+function countIn(left, when) {
+  if (beatBuffers) audio.play('count', beatBuffers.get('woodblock'), when, left === COUNT ? 0.75 : 0.5);
+  setTimeout(() => {
+    if (!seq.counting) return;
+    bar.recText.textContent = String(left);
+    for (let i = 0; i < bar.dots.children.length; i++) {
+      bar.dots.children[i].classList.toggle('on', i < left);
+    }
+  }, Math.max(0, (when - audio.audioNow()) * 1000));
 }
 
 function toggleLoop() {
@@ -639,10 +663,11 @@ function playBeatStep(step, when) {
   if (step === 0 || step === 4) audio.play('beat-boom', beatBuffers.get('kick'), when, 0.5);
   if (step === 2 || step === 6) audio.play('beat-tak', beatBuffers.get('snare'), when, 0.4);
   if (step % 2) return;
-  // Light the matching dot when that beat reaches the speaker.
+  // Light the matching dot when that beat reaches the speaker. While counting in, the
+  // count owns the dots.
   const beat = step / 2;
   setTimeout(() => {
-    if (!seq.beat) return;
+    if (!seq.beat || seq.counting) return;
     for (let i = 0; i < bar.dots.children.length; i++) {
       bar.dots.children[i].classList.toggle('on', i === beat);
     }
@@ -902,7 +927,7 @@ function maybeCoach() {
   coached = true;
   setTimeout(() => {
     if (!recorded && !seq.hasLoop && !seq.recording && !capture) {
-      toast('Now tap the big red button, play your pads, and tap it again to hear your beat.', 9000);
+      toast('Now tap “Make a beat”, play your pads, then tap it again — your beat plays back over and over.', 9000);
     }
   }, 1400);
 }
