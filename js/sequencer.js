@@ -13,9 +13,9 @@ const TAIL = 0.15;       // the loop never ends right on top of its last hit
 export const STEPS = 8;  // eighth notes in one bar of the beat
 
 export const SPEEDS = [
-  { id: 'slow', name: 'Slow', bpm: 72 },
-  { id: 'medium', name: 'Medium', bpm: 96 },
-  { id: 'fast', name: 'Fast', bpm: 126 },
+  { id: 'slow', name: 'Slow', short: 'Slow', bpm: 72 },
+  { id: 'medium', name: 'Medium', short: 'Med', bpm: 96 },
+  { id: 'fast', name: 'Fast', short: 'Fast', bpm: 126 },
 ];
 
 export class Sequencer {

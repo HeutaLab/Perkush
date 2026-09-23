@@ -79,6 +79,7 @@
       <button type="button" class="pill" id="edit" aria-pressed="false" disabled>Edit</button>
     </header>
 
+    <div class="bar-wrap">
     <div class="beatbar" id="beatbar" hidden>
       <button type="button" class="bb rec" id="rec" aria-pressed="false" aria-label="Record what you play">
         <span class="rec-dot" aria-hidden="true"></span><span class="bb-text">Record</span>
@@ -98,8 +99,10 @@
         <span class="bb-text">Beat</span>
       </button>
       <div class="beat-dots" id="dots" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-      <button type="button" class="bb speed" id="speed">Medium</button>
+      <button type="button" class="bb speed" id="speed"><span class="s-long">Medium</span><span class="s-short">Med</span></button>
       <div class="bb-line" aria-hidden="true"><div id="bb-fill"></div></div>
+    </div>
+    <p class="coach" id="coach" aria-hidden="true" hidden>Tap me to record what you play!</p>
     </div>
 
     <main id="stage">

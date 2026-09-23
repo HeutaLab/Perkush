@@ -19,6 +19,7 @@ const BLOCK_DEPTH = 6;       // px; matches --d in board.css
 const FACING_KEY = 'video-drum-board.facing';
 const EFFECT_KEY = 'perkush.effect';
 const SPEED_KEY = 'perkush.speed';
+const RECORDED_KEY = 'perkush.recorded';   // set once a child has made a beat here
 const NEW_NAMES = ['Kitchen', 'Animals', 'Playground', 'Garden', 'Space', 'Monsters', 'Band', 'Jungle'];
 
 const ICON_CLOSE =
@@ -70,7 +71,10 @@ const bar = {
   beat: document.getElementById('beat'),
   dots: document.getElementById('dots'),
   speed: document.getElementById('speed'),
+  speedLong: document.querySelector('#speed .s-long'),
+  speedShort: document.querySelector('#speed .s-short'),
   hint: document.getElementById('bb-hint'),
+  coach: document.getElementById('coach'),
   fill: document.getElementById('bb-fill'),
 };
 const hint = document.getElementById('hint');
@@ -92,6 +96,10 @@ let effect = effectById(readSetting(EFFECT_KEY)).id;
 let cameraCount = 2;         // assume a camera switch is possible until we know better
 let beatBuffers = null;      // instrument sounds used by the play-along beat
 let beatLoading = false;
+let recorded = readSetting(RECORDED_KEY) === 'yes';
+let coached = false;        // the spoken-out-loud nudge, once per visit
+let coachOff = false;       // the bubble has been seen or tapped past
+let coachTimer = 0;
 let wipeTimer = 0;
 let raf = 0;
 let toastTimer = 0;
@@ -107,6 +115,11 @@ const seq = new Sequencer({
     if (!current) return;
     current.loop = loop;
     saveBoardRecord(current);
+    if (loop && !recorded) {
+      recorded = true;
+      writeSetting(RECORDED_KEY, 'yes');
+      toast('That is your beat, playing over and over. Tap the pads to join in!', 8000);
+    }
   },
 });
 
@@ -336,6 +349,7 @@ async function assignInstrument(pad, inst) {
   setState(pad, 'filled');
   updateChrome();
   celebrate(pad);
+  maybeCoach();
   const board = current;
   persist(pad, async () => {
     await store.savePad(board.id, { pad: pad.index, v: 1, kind: 'inst', inst: inst.id, created: Date.now() });
@@ -518,6 +532,13 @@ function kick() {
 function renderBar() {
   const anyFilled = pads.some((p) => p.clip);
   bar.root.hidden = !anyFilled && !seq.hasLoop;
+  bar.root.classList.toggle('taking', seq.recording);
+  // Until a child has made a beat once, the button waves and the hint points at it.
+  const teaching = !recorded && anyFilled && !seq.recording && !seq.hasLoop && !capture;
+  bar.rec.classList.toggle('nudge', teaching);
+  bar.coach.hidden = !teaching || coachOff;
+  // It has said its piece after half a minute, and the button keeps waving on its own.
+  if (!bar.coach.hidden && !coachTimer) coachTimer = setTimeout(hideCoach, 30000);
   bar.rec.classList.toggle('on', seq.recording);
   bar.rec.setAttribute('aria-pressed', String(seq.recording));
   bar.rec.disabled = !!capture;
@@ -531,13 +552,14 @@ function renderBar() {
   bar.beat.setAttribute('aria-pressed', String(seq.beat));
   bar.beat.disabled = !!capture;
   bar.dots.hidden = !seq.beat;
-  bar.speed.textContent = seq.speed.name;
+  bar.speedLong.textContent = seq.speed.name;
+  bar.speedShort.textContent = seq.speed.short;
   bar.speed.setAttribute('aria-label', `Beat speed: ${seq.speed.name}. Tap to change.`);
+  bar.root.classList.toggle('beat-on', seq.beat);
+  // A quiet status line; the bubble under the button does the teaching.
   bar.hint.textContent =
-    seq.recording ? 'Tap the pads — then tap the red button again' :
-    seq.playing ? 'Your beat is playing. Tap along with it!' :
-    seq.hasLoop ? 'Tap Play to hear your beat again' :
-    'Tap the red button to record what you play';
+    seq.recording ? 'Tap your pads!' :
+    seq.playing ? 'Your beat is looping' : '';
   if (!seq.recording && !seq.playing) bar.fill.style.transform = 'scaleX(0)';
   if (!seq.hasLoop) cancelWipeConfirm();
   kick();
@@ -673,6 +695,7 @@ async function startCapture(pad) {
     const { clip, encode } = await clipFromCapture(result);
     installClip(pad, clip);
     celebrate(pad);
+    maybeCoach();
     const board = current;
     persist(pad, async () => {
       const record = await encode();
@@ -863,6 +886,25 @@ function clearPad(pad) {
 // older save finishing late.
 function persist(pad, op, failure, consequence) {
   pad.io = pad.io.then(op).catch((err) => toast(`${failure} (${errorText(err)}). ${consequence}`));
+}
+
+function hideCoach() {
+  clearTimeout(coachTimer);
+  coachTimer = 0;
+  if (coachOff) return;
+  coachOff = true;
+  bar.coach.hidden = true;
+}
+
+// The first sound on a board is the moment to mention the red button.
+function maybeCoach() {
+  if (recorded || coached) return;
+  coached = true;
+  setTimeout(() => {
+    if (!recorded && !seq.hasLoop && !seq.recording && !capture) {
+      toast('Now tap the big red button, play your pads, and tap it again to hear your beat.', 9000);
+    }
+  }, 1400);
 }
 
 function updateChrome() {
@@ -1318,6 +1360,7 @@ async function boot() {
 
   editButton.addEventListener('click', () => setEditing(!editing));
   boardsButton.addEventListener('click', openSheet);
+  bar.root.addEventListener('pointerdown', hideCoach); // they have found the bar
   bar.rec.addEventListener('click', toggleRecording);
   bar.loop.addEventListener('click', toggleLoop);
   bar.wipe.addEventListener('click', onWipe);
